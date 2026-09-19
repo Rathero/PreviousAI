@@ -22,10 +22,13 @@
   <div class="bg-vignette" aria-hidden="true"></div>
   <div class="bg-dots" aria-hidden="true"></div>
 
+  <img class="home-side left" src="/assets/media/home-safe.jpg" alt="A home at dusk, safe and intact">
+  <img class="home-side right" src="/assets/media/home-fire.jpg" alt="The same home engulfed in flames">
+
   <div class="home-stack">
     <div class="brand-block">
       <div class="logo logo-lg" aria-label="Previous AI">Previous<span>AI</span></div>
-      <p class="tagline">Today's knowledge. Protect what matters</p>
+      <p class="tagline">Today's awareness. Protect what matters</p>
     </div>
 
     <form class="glass home-card" id="homeForm" novalidate>
@@ -71,7 +74,15 @@
 </main>
 
 <!-- ============================================================ Risk report -->
-<main id="report" class="view view-report" hidden>
+<main id="report" class="view view-report" data-active="" hidden>
+  <div class="rep-bg" aria-hidden="true">
+    <div class="pv-bg pv-bg-a" data-bg="avalanche"></div>
+    <div class="pv-bg pv-bg-b" data-bg="wildfire"></div>
+    <div class="pv-bg pv-bg-a" data-bg="flood"></div>
+    <div class="pv-bg pv-bg-b" data-bg="heat"></div>
+    <div class="rep-shade"></div>
+  </div>
+
   <header class="rep-header">
     <div class="rep-brand">
       <a href="/" class="logo logo-sm" data-nav aria-label="Previous AI, home">Previous<span>AI</span></a>
@@ -99,49 +110,55 @@
     </div>
   </header>
 
-  <section class="rep-main">
-    <article class="card media-card" id="mediaCard" aria-labelledby="mediaTitle">
-      <div class="card-head">
+  <section class="rep-hero">
+    <div class="hero-text" aria-live="polite">
+      <h1 id="heroTitle"></h1>
+      <p id="heroText"></p>
+    </div>
+    <div class="hero-media">
+      <button type="button" class="thumb" id="thumb" aria-label="Open the street view of the home">
+        <span class="thumb-media" id="thumbMedia"></span>
+        <span class="thumb-label" id="thumbLabel"></span>
+      </button>
+      <button type="button" class="ghost-btn" id="briefingBtn" hidden>
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"></path></svg>
+        Video briefing</button>
+    </div>
+  </section>
+
+  <section class="tiles" id="tiles" aria-label="The four risks at this home"></section>
+
+  <section class="pv-card detail" id="detail" aria-live="polite"></section>
+
+  <p class="rep-foot" id="repFoot"></p>
+
+  <!-- The home's pictures, large: street view, aerial view, AI illustration, video briefing -->
+  <div class="overlay" id="viewer" hidden>
+    <div class="overlay-backdrop" data-close></div>
+    <div class="overlay-panel viewer-panel glass-solid" role="dialog" aria-modal="true" aria-labelledby="mediaTitle">
+      <div class="panel-head">
         <h2 id="mediaTitle">Street view</h2>
-        <div class="card-head-right">
-          <span class="source" id="mediaSource">Google Street View</span>
-          <button type="button" class="head-btn" id="previewBtn" aria-pressed="false" hidden>
-            <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M5 0l1.2 3.8L10 5 6.2 6.2 5 10 3.8 6.2 0 5l3.8-1.2z" fill="currentColor"></path></svg>
-            AI preview</button>
-          <button type="button" class="head-btn" id="briefingBtn" hidden>
-            <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1.2v7.6L8.6 5z" fill="currentColor"></path></svg>
-            Video briefing</button>
-          <button type="button" class="head-btn close" id="mediaClose" hidden aria-label="Back to street view">&times;</button>
+        <div class="panel-head-right">
+          <span class="source" id="mediaSource"></span>
+          <button type="button" class="icon-btn" id="mediaClose" data-close aria-label="Close">&times;</button>
         </div>
       </div>
       <div class="media" id="media"></div>
-    </article>
+    </div>
+  </div>
 
-    <article class="card risks-card" aria-labelledby="risksTitle">
-      <div class="card-head">
-        <h2 id="risksTitle">Risks nearby</h2>
-        <span class="source" id="risksStatus" aria-live="polite"></span>
+  <!-- The full action plan -->
+  <div class="overlay" id="planDialog" hidden>
+    <div class="overlay-backdrop" data-close></div>
+    <div class="overlay-panel plan-panel glass-solid" role="dialog" aria-modal="true" aria-labelledby="planTitle">
+      <div class="panel-head">
+        <h2 id="planTitle">Your action plan</h2>
+        <button type="button" class="icon-btn" id="planClose" data-close aria-label="Close">&times;</button>
       </div>
-      <div class="risk-list scroll" id="riskList"></div>
-    </article>
-  </section>
-
-  <section class="rep-bottom">
-    <article class="card history-card" aria-labelledby="historyTitle">
-      <h2 id="historyTitle">Historic</h2>
-      <div class="history scroll" id="history"></div>
-    </article>
-
-    <article class="card plan-card" aria-labelledby="planTitle">
-      <div class="card-head">
-        <h2 id="planTitle">Action plan</h2>
-        <div class="tabs" id="planTabs" role="tablist" aria-label="Plans"></div>
-      </div>
-      <div class="plan" id="plan"></div>
-    </article>
-  </section>
-
-  <footer class="rep-foot" id="repFoot"></footer>
+      <div class="tabs" id="planTabs" role="tablist" aria-label="Plans"></div>
+      <div class="plan scroll" id="plan"></div>
+    </div>
+  </div>
 </main>
 
 <script src="/vendor/leaflet/leaflet.js" defer></script>

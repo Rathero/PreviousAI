@@ -28,8 +28,8 @@ called. Two rules apply to all of them:
 | [Nebius Token Factory](#nebius-token-factory) | Typed AI decisions (Qwen3-235B) | Live API | `NEBIUS_API_KEY` | Household advice ranking, free-text requests, claim checks |
 | [TypeSafe Jev](#typesafe-jev) | Typed AI decisions (fallback) | Live API | `TYPESAFE_API_KEY` | Same as Nebius, when Nebius fails |
 | [fal.ai](#falai) | Illustration clips, narration, speech to text | Batch + live queue | `FAL_KEY` | Risk illustrations, video briefing, voice address input |
-| [Google Street View](#google-street-view) | Street-level picture of the home | Live Static API | `GOOGLE_MAPS_API_KEY` | Street view card |
-| [EOX Sentinel-2 cloudless](#eox-sentinel-2-cloudless) | Aerial imagery outside Spain | Live WMTS | No | Aerial fallback of the street view card |
+| [Google Street View](#google-street-view) | Street-level picture of the home | Live Static API | `GOOGLE_MAPS_API_KEY` | Picture of the home |
+| [EOX Sentinel-2 cloudless](#eox-sentinel-2-cloudless) | Aerial imagery outside Spain | Live WMTS | No | Aerial fallback of the picture of the home |
 | [Devin (Cognition)](#devin-cognition) | Autonomous code changes, judged by the gate | API v3 | `DEVIN_API_KEY`, `DEVIN_ORG_ID` | `backend/autonomy/`, `scripts/devin_run.py` |
 | [Meteocat (open-data portal)](#meteocat-catalonias-open-data-portal) | Official weather stations | Live SoQL | No | The gate's reference answers |
 | [Action plan partners](#action-plan-partners) | Products, services and insurance | Links | — | Action plan, "Buy or arrange" |
@@ -248,9 +248,10 @@ narrates and listens; it never touches a number.
 - **Illustration library**: 19 clips generated once by `scripts/fal_media.py` and kept in
   `data/media/illustrations` with a manifest of models, prompts and seeds. In a report, the
   data pick the clip: the mapped water depth for floods, the level for the other risks. In
-  the app, "What it could look like" inside a risk plays it in the large card, labelled
-  "AI illustration · not this place" with the value that chose it.
-- **Video briefing**: the "Video briefing" button on the large card. The script is written
+  the app, picking a risk turns the picture of the home into its clip, and "What it could
+  look like" opens it large, labelled "AI illustration · not this place" with the value
+  that chose it.
+- **Video briefing**: the "Video briefing" button next to the picture. The script is written
   by code from the report, word for word (`briefing.py`); fal.ai only reads it aloud;
   ffmpeg (bundled by `imageio-ffmpeg`) assembles the scenes over the illustrations. Cached
   by content.

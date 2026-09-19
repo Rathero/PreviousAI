@@ -1,23 +1,25 @@
 # Previous AI
 
-**Today's knowledge. Protect what matters.**
+**Today's awareness. Protect what matters.**
 
 Give Previous AI the address of a home and it shows the natural risks around it —
-**wildfires, floods, heat waves and avalanches** — what has already happened nearby, and
+**fire, flooding, heat waves and avalanches** — what has already happened nearby, and
 an action plan to prepare. Every figure comes from public scientific or official data and
 carries its source; AI and generated media help read the report but never produce a
 score.
 
-- **Street view** of the home (Google Street View; aerial imagery when there is no
-  panorama), which can switch to an AI illustration of what a risk could look like, or to
-  a narrated video briefing of the report.
-- **Risks nearby**: one row per risk with its level (0–100) and, when opened, what drives
-  it, the source and what it means for this home (a 4th-floor flat is not a ground floor).
-- **Historic**: flood episodes, wildfires, fires seen by satellite, avalanches and the
-  hottest and wettest days on record around the address.
-- **Action plan**: a basic emergency plan and, for each risk present, what to do before,
-  what to buy or arrange (with partners), what to do during and after. Tick items off as
-  you go; tell us who lives there and the plan puts first what matters for them.
+- **One sentence** that sums the home up ("Two things are worth preparing for at this
+  home"), next to a picture of it (Google Street View; aerial imagery when there is no
+  panorama) and a narrated **video briefing** of the report.
+- **Four risks**, each with its level (0–100) and one fact. Picking one turns the page to
+  its colours, shows what already happened near the home (flood episodes, wildfires, fires
+  seen by satellite, avalanches, the wettest and hottest days on record), what it means for
+  this home (a 4th-floor flat is not a ground floor) and its first steps; the picture
+  becomes an AI illustration of what that risk could look like.
+- **Action plan**: a basic emergency plan and, for each risk worth preparing for, what to
+  do before, what to buy or arrange (with partners), what to do during and after. Tick
+  items off as you go; tell us who lives there and the plan puts first what matters for
+  them.
 
 The app is public: no sign-up and no login.
 
@@ -47,13 +49,13 @@ backend/app/         FastAPI API and the report engine
                      Government of Catalonia), avalanches, regional levels
   scoring.py         Every breakpoint from a physical value to a 0-100 score
   indicators.py      The provenance contract
-  history.py         The Historic card
-  action_plan.py     The Action plan and its partners
+  history.py         What already happened near the home
+  action_plan.py     The action plan and its partners
   dwelling.py        House or flat, and the floor: who acts, what the water means
   protection.py      The measure catalogue (costs, standards, official programmes)
   media.py           The fal.ai illustration library, picked by each card's value
   briefing.py        The narrated video briefing (script written by code)
-  view.py            The report as the web app shows it
+  view.py            The report as the web app shows it (headline, facts, stories)
   providers/         One module per external service
 backend/scripts/     Batch pipelines: cache warm-up, Catalan layers, Copernicus CDS,
                      fal.ai library, Devin runs

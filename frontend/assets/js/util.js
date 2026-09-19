@@ -9,15 +9,6 @@ export const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
 export const REDUCED_MOTION = !!(window.matchMedia &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches);
 
-export const FAMILY_COLOR = {
-  wildfire: "#E58A63", flood: "#7FB4DC", avalanche: "#C7CBD6", heat: "#E7C077",
-  emergency: "#F7F5EF",
-};
-export const FAMILY_FADED = {
-  wildfire: "rgba(229,138,99,0.22)", flood: "rgba(127,180,220,0.22)",
-  avalanche: "rgba(199,203,214,0.22)", heat: "rgba(231,192,119,0.22)",
-};
-
 export const PROFILES = [
   ["children", "Children"],
   ["older_adults", "Over-65s"],
