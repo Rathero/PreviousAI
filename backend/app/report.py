@@ -182,6 +182,11 @@ async def build_report(
     results = await asyncio.gather(*tasks.values(), return_exceptions=True)
     data = dict(zip(tasks.keys(), results))
     data["terrain"] = relief_first
+    # Inside a river flood zone but no depth at the point: the model leaves buildings out,
+    # so the depth is read at the nearest flooded cell (the street at the door).
+    if isinstance(data.get("flood_zones"), dict) and isinstance(data.get("flood_depths"), dict):
+        data["flood_depths"] = await ign_flood.complete_at_door(
+            lat_f, lon_f, data["flood_zones"], data["flood_depths"])
     # Avalanches: ICGC's local layer (Catalonia), then snowfall only where there is
     # avalanche terrain, so flat places never pay for that request.
     data["avalanche"] = cat.avalanches_near(lat_f, lon_f) if municipality else None

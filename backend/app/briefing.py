@@ -28,11 +28,11 @@ import uuid
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-from . import config, media, video
+from . import config, media, video, view
 from .hazards import MONTHS_EN
 from .providers import fal
 
-VERSION = 2   # bump when the look changes: cached briefings are keyed by it
+VERSION = 3   # bump when the look changes: cached briefings are keyed by it
 W, H = 1280, 720
 OUT_DIR = config.MEDIA_DIR / "briefings"
 WORK_DIR = config.CACHE_DIR / "briefing_work"
@@ -45,7 +45,8 @@ TAIL_S = 0.5     # and after it ends
 COLORS = {"bg": (16, 29, 19), "panel": (24, 42, 27), "text": (247, 245, 239),
           "muted": (196, 202, 186), "ai": (186, 242, 74), "accent": (186, 242, 74)}
 # Each hazard keeps the colour it has in the web app.
-FAMILY_RGB = {"heat": (231, 192, 119), "rain": (127, 180, 220), "flood_zone": (127, 180, 220),
+FAMILY_RGB = {"heat": (231, 192, 119), "flood": (127, 180, 220), "rain": (127, 180, 220),
+              "flood_zone": (127, 180, 220),
               "flood_history": (127, 180, 220), "sea_level": (127, 180, 220),
               "flood_regional": (127, 180, 220), "wildfire": (229, 138, 99),
               "fire_history": (229, 138, 99), "avalanche": (199, 203, 214)}
@@ -171,52 +172,88 @@ def _sentence(text: str) -> str:
     return text if text.endswith((".", "!", "?")) else text + "."
 
 
-def build_script(report: dict) -> list[Scene]:
-    place = spoken_place(report)
-    overall = report["overall"]
-    scored = sorted((h for h in report["hazards"] if h.get("score") is not None),
-                    key=lambda h: -h["score"])
-    top = [h for h in scored if h["score"] >= 20][:MAX_HAZARDS] or scored[:1]
-    level, score = overall["level"], round(overall["score"])
+def _what_to_do(report: dict, worst: dict | None) -> tuple[str, str] | None:
+    """The advice the video reads, from the report's action plan: the household's first
+    measure when one was ranked for it, else the first steps before the worst risk."""
+    plan = report.get("action_plan") or {}
+    household = [a for a in plan.get("household") or [] if isinstance(a, dict) and a.get("text")]
+    if household:
+        return "For your household", _sentence(household[0]["text"])
+    hazard = next((p for p in plan.get("plans", []) if worst and p.get("key") == worst["key"]), None)
+    before = next((ph for ph in (hazard or {}).get("phases", []) if ph["key"] == "before"), None)
+    if before and before["items"]:
+        steps = ["".join(seg["text"] for seg in item["segments"]) for item in before["items"][:2]]
+        return before["label"], " ".join(_sentence(step) for step in steps)
+    return None
 
+
+def build_script(report: dict) -> list[Scene]:
+    """The script, scene by scene: the four risks exactly as the app shows them (the worst
+    opens, those of 20 or more get a scene each, all of them close), each told through
+    the card that sets its score."""
+    place = spoken_place(report)
+    cards = {h["key"]: h for h in report["hazards"]}
+    risks = sorted((r for r in view.risks(report) if r["score"] is not None and r["cards"]),
+                   key=lambda r: -r["score"])
+    shown = [r for r in risks if r["score"] >= 20][:MAX_HAZARDS] or risks[:1]
+    worst = risks[0] if risks else None
+
+    def clip(risk: dict) -> str | None:
+        """The illustration of the risk's worst card that has one."""
+        return next(((cards[c["key"]].get("illustration") or {}).get("id") for c in risk["cards"]
+                     if cards[c["key"]].get("illustration")), None)
+
+    intro = f"Previous AI report for {place}, {_when(report)}."
+    if worst:
+        intro += f" The highest risk here: {worst['label'].lower()}, {worst['score']} out of 100."
     scenes = [Scene(
         kind="intro", title=place, kicker="Previous AI · natural hazard report",
         caption=f"Flooding, wildfire, avalanches and extreme heat, {_when(report)}.",
-        figure=f"{score}/100", figure_label=f"overall · {level}", level=level,
-        illustration=((top[0].get("illustration") or {}).get("id") if top else None),
-        say=f"Previous AI report for {place}, {_when(report)}. Overall hazard: {level}, {score} out of 100.",
+        figure=f"{worst['score']}%" if worst else "",
+        figure_label=f"{worst['label'].lower()} · {worst['level']}" if worst else "",
+        level=(worst or {}).get("level"), tint=FAMILY_RGB.get((worst or {}).get("key")),
+        illustration=next((c for c in map(clip, shown + risks) if c), None),
+        say=intro,
     )]
 
-    for h in top:
+    # What the flood map means for this home (its floor), said with the flood scene.
+    home_note = ((report.get("dwelling") or {}).get("notes") or {}).get("flood")
+    for risk in shown:
+        h = cards[risk["cards"][0]["key"]]
         ind = key_indicator(h)
         figure = _shown(ind) if ind else ""
-        say = f"{h['label']}: {h['level']}, {round(h['score'])} out of 100. {_sentence(h['headline'])}"
-        # The figure is said only when the headline does not already say it: the
-        # headline is written from the primary metric ("brings 44 mm"), so repeating
-        # it ("44.4 mm") only adds seconds. The flood depth is not in the headline.
+        say = f"{risk['label']}: {risk['level']}, {risk['score']} out of 100. {_sentence(h['headline'])}"
+        # The figure is said only when nothing else says it: the headline is written
+        # from the primary metric ("brings 44 mm"), so repeating it ("44.4 mm") only adds
+        # seconds, and a bare "Yes" adds nothing. The flood depth is not in the headline,
+        # but the note on the home says it, measured against the floor.
+        note = home_note if risk["key"] == "flood" else None
         number = re.search(r"\d[\d.,]*", figure or "")
-        if (ind and figure and ind.get("key") != h.get("primary_metric")
+        if (ind and figure and not note and ind.get("key") != h.get("primary_metric")
+                and not figure.startswith(("Yes", "No"))
                 and not (number and number.group(0) in h["headline"])):
             say += f" {ind['label']}: {figure}."
-        ill = h.get("illustration") or {}
+        if note:
+            say += f" {_sentence(note)}"
         scenes.append(Scene(
-            kind="hazard", kicker=f"{h['label']} · {h['level']} · {round(h['score'])}/100",
+            kind="hazard", kicker=f"{risk['label']} · {risk['level']} · {risk['score']}%",
             figure=figure, figure_label=(ind or {}).get("label", ""),
-            caption=h["headline"], level=h["level"], tint=FAMILY_RGB.get(h["key"]),
-            illustration=ill.get("id"),
+            caption=h["headline"], level=risk["level"], tint=FAMILY_RGB.get(risk["key"]),
+            illustration=clip(risk),
             say=speakable(say),
         ))
 
-    advice = [a for a in (report.get("narrative") or {}).get("advice") or [] if isinstance(a, dict)]
-    if advice:
-        first = advice[0]
+    tip = _what_to_do(report, worst)
+    if tip:
+        about, text = tip
         scenes.append(Scene(
-            kind="advice", kicker="What to do about it", caption=first["text"],
-            figure_label=first.get("hazard_label", ""), level=None,
-            say=speakable("What to do: " + _sentence(first["text"])),
+            kind="advice", kicker="What to do about it", caption=text,
+            figure_label=about, level=None,
+            say=speakable(f"{about}: {text}"),
         ))
 
-    glance = [f"{h['label']}: {h['level']}, {round(h['score'])}/100" for h in scored[:5]]
+    glance = [f"{r['label']}: {r['score']}%" for r in sorted(
+        (r for r in view.risks(report) if r["score"] is not None), key=lambda r: -r["score"])]
     scenes.append(Scene(
         kind="closing", title="Your home at a glance", lines=glance,
         caption="The full report shows what each value means and what it does not say.",

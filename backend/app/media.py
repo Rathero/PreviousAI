@@ -250,7 +250,7 @@ def catalogue() -> list[dict]:
         scenes.append({
             "id": f"flood-depth-{suffix}", "family": "flooding", "card": "flood_zone",
             "selector": f"SNCZI water depth {_band_text(lo, hi)}",
-            "title": f"What {short} of floodwater looks like",
+            "title": f"What floodwater {short} deep looks like",
             "caption": f"Illustration for a water depth of {_band_text(lo, hi)}, in a generic "
                        f"street. The door is about 2 m tall; a car wheel, about 60 cm.",
             "base": FLOOD_BASE["id"], "image_prompt": prompt, "motion_prompt": FLOOD_MOTION,

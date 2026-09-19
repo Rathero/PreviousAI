@@ -290,6 +290,7 @@ async function loadReport({ keepMedia = false } = {}) {
     stopProgress();
     renderHeader();
     renderRisks();
+    media.setPreviews((data.risks || []).filter((r) => r.illustration).sort((a, b) => b.score - a.score));
     renderHistory();
     renderPlanTabs();
     renderPlan();
@@ -331,6 +332,13 @@ export function initReport(appRef) {
   media.init();
   media.onChange((mode) => {
     $$(".risk-media").forEach((b) => b.setAttribute("aria-pressed", String(mode === `risk:${b.dataset.risk}`)));
+    // The risk being illustrated opens in the list, so the picture keeps its context.
+    const shown = mode.startsWith("risk:") ? mode.slice(5) : null;
+    if (shown && !expanded.has(shown) && $(`#risk-${shown}-body`)) {
+      expanded.add(shown);
+      $(`#risk-${shown}-btn`).setAttribute("aria-expanded", "true");
+      $(`#risk-${shown}-body`).hidden = false;
+    }
   });
 
   $("#riskList").addEventListener("click", (e) => {

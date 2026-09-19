@@ -142,12 +142,19 @@ def hazard_flood_zones(result: dict | None, depths: dict | None = None) -> Hazar
         if fluvial_depth:
             periods = {"fluvial_t10": "10", "fluvial_t100": "100", "fluvial_t500": "500"}
             others = [f"T{periods[k]}: {_m(d[k])}" for k in periods if d.get(k) and k != ref_key]
+            door = ((depths or {}).get("door") or {}).get(ref_key)
+            context = [f"Read {max(1, round(door))} m from the address point: the flood model leaves "
+                       f"buildings out, so this is the water in the street next to it"] if door else []
+            if others:
+                context.append("Other return periods: " + ", ".join(others))
             indicators.append(_ind(
                 "flood_depth_fluvial", f"River water depth, {periods[ref_key]}-year flood",
                 fluvial_depth, "m", IGN_SNCZI,
                 period="current SNCZI mapping",
-                method="IGN river raster water depth at the point",
-                context=("Other return periods: " + ", ".join(others)) if others else None,
+                method=("IGN river raster water depth at the nearest flooded cell within 15 m "
+                        "of the point, which the official polygons put inside the zone" if door
+                        else "IGN river raster water depth at the point"),
+                context="; ".join(context) or None,
             ))
 
     return Hazard(

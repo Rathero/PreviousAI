@@ -1,6 +1,7 @@
 // The large media card: the home at street level (Google Street View), or from the air
 // when there is no panorama; the AI illustration of a risk; and the narrated video
-// briefing. Illustrations and narration come from fal.ai and are labelled as such.
+// briefing. Illustrations and narration come from fal.ai; the page labels them as AI,
+// without naming the provider.
 
 import { api } from "./api.js";
 import { $, esc, REDUCED_MOTION } from "./util.js";
@@ -11,6 +12,7 @@ const PIN_SVG = `<svg width="34" height="34" viewBox="0 0 24 24" fill="none" str
 
 let place = null;          // {lat, lon, label, aerial, zoom}
 let street = null;         // Street View metadata once known
+let previews = [];         // the risks with an AI illustration, worst first
 let mode = "street";
 let token = 0;             // guards async work against a newer state
 let map = null;
@@ -25,7 +27,12 @@ function header(title, source, { closable = false } = {}) {
   $("#mediaClose").hidden = !closable;
 }
 
-function notify() { listeners.forEach((fn) => fn(mode)); }
+function notify() {
+  const btn = $("#previewBtn");
+  btn.hidden = !previews.length;
+  btn.setAttribute("aria-pressed", String(mode.startsWith("risk:")));
+  listeners.forEach((fn) => fn(mode));
+}
 
 function teardownMap() {
   if (map) { map.remove(); map = null; }
@@ -95,14 +102,18 @@ function renderIllustration(risk) {
   const el = box();
   teardownMap();
   el.classList.remove("empty");
-  header(`${risk.label} · what it could look like`, "AI illustration", { closable: true });
+  header(`${risk.label} · what it could look like`, "", { closable: true });
   const c = ill.chosen_by || {};
   const chosen = c.shown ? `Chosen by ${esc(c.label.toLowerCase())}: ${esc(c.shown)}.` : "";
+  const others = previews.length > 1
+    ? `<div class="media-switch" role="group" aria-label="Risks with an AI illustration">${previews.map((r) =>
+      `<button type="button" data-switch="${esc(r.key)}" aria-pressed="${r.key === risk.key}">${esc(r.label)}</button>`).join("")}</div>`
+    : "";
   el.innerHTML = `
     <video class="media-fill" ${REDUCED_MOTION ? "controls" : "autoplay loop"} muted playsinline preload="auto"
       poster="${esc(ill.poster || "")}" src="${esc(ill.video)}"
       aria-label="${esc(ill.title)}. AI illustration of a generic place"></video>
-    <span class="media-badge">AI illustration · not this place</span>
+    <span class="media-badge">AI illustration · not this place</span>${others}
     <div class="media-caption"><b>${esc(ill.title)}.</b> ${esc(ill.caption)}
       ${risk.home_note ? `<span class="home-note">${esc(risk.home_note)}</span>` : ""}
       <span class="fine">${chosen} ${esc(ill.limitation || "")}</span></div>`;
@@ -163,14 +174,30 @@ async function runBriefing(ctx) {
 export const media = {
   init() {
     $("#mediaClose").addEventListener("click", () => media.showStreet());
+    $("#previewBtn").addEventListener("click", () => {
+      if (mode.startsWith("risk:")) media.showStreet();
+      else media.showIllustration(previews[0]);
+    });
+    box().addEventListener("click", (e) => {
+      const pick = e.target.closest("[data-switch]");
+      if (pick) media.showIllustration(previews.find((r) => r.key === pick.dataset.switch));
+    });
   },
   onChange(fn) { listeners.push(fn); },
   mode() { return mode; },
+
+  // The risks whose data picked an illustration, worst first: the header's
+  // "AI preview" opens the first, and the picture offers the others.
+  setPreviews(risks) {
+    previews = risks || [];
+    notify();
+  },
 
   reset() {
     token++;
     place = null;
     street = null;
+    previews = [];
     mode = "street";
     header("Street view", "");
     placeholder("Finding your home…", { spinner: true });
