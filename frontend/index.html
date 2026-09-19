@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Previous AI · Natural risks at your home</title>
+<meta name="description" content="Tell us your home's address and see its flood, wildfire, avalanche and heat risks, what has already happened nearby and a plan to prepare.">
+<meta name="theme-color" content="#101d13">
+<link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
+<link rel="preload" href="/assets/fonts/BricolageGrotesque.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="stylesheet" href="/vendor/leaflet/leaflet.css">
+<link rel="stylesheet" href="/assets/css/app.css">
+</head>
+<body>
+
+<!-- ============================================================ Home address -->
+<main id="home" class="view view-home" hidden>
+  <video class="bg-video" id="homeVideo" autoplay loop muted playsinline preload="auto"
+         poster="/assets/media/home-background.jpg" aria-hidden="true" tabindex="-1">
+    <source src="/assets/media/home-background.mp4" type="video/mp4">
+  </video>
+  <div class="bg-vignette" aria-hidden="true"></div>
+  <div class="bg-dots" aria-hidden="true"></div>
+
+  <div class="home-stack">
+    <div class="brand-block">
+      <div class="logo logo-lg" aria-label="Previous AI">Previous<span>AI</span></div>
+      <p class="tagline">Today's knowledge. Protect what matters</p>
+    </div>
+
+    <form class="glass home-card" id="homeForm" novalidate>
+      <div class="home-head">
+        <h1>Where's your home?</h1>
+        <p>Tell us the address and we'll map the natural risks nearby.</p>
+      </div>
+
+      <div class="field">
+        <label for="address" class="label">Home address</label>
+        <div class="address-wrap">
+          <input id="address" class="pv-input" type="text" placeholder="Street, number, city"
+                 autocomplete="off" spellcheck="false" role="combobox" aria-autocomplete="list"
+                 aria-expanded="false" aria-controls="suggestions">
+          <button type="button" class="mic" id="mic" hidden aria-pressed="false"
+                  aria-label="Say your address instead of typing it">
+            <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"
+                 stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="9" y="3" width="6" height="11" rx="3"></rect><path d="M5 11a7 7 0 0 0 14 0M12 18v3"></path></svg>
+          </button>
+          <ul id="suggestions" class="suggestions glass-solid" role="listbox" aria-label="Suggested addresses" hidden></ul>
+        </div>
+        <p class="field-msg" id="addressMsg" aria-live="polite"></p>
+      </div>
+
+      <div class="field">
+        <span class="label" id="typeLabel">Type of home</span>
+        <div class="pills" role="group" aria-labelledby="typeLabel">
+          <button type="button" class="pill" data-kind="house" aria-pressed="true">House</button>
+          <button type="button" class="pill" data-kind="apartment" aria-pressed="false">Apartment building</button>
+        </div>
+      </div>
+
+      <div class="field" id="floorField" hidden>
+        <label for="floor" class="label">Which floor do you live on?</label>
+        <input id="floor" class="pv-input floor-input" type="number" min="0" max="150" step="1"
+               inputmode="numeric" placeholder="e.g. 3">
+      </div>
+
+      <button type="submit" class="cta" id="seeRisks">See risks →</button>
+    </form>
+  </div>
+</main>
+
+<!-- ============================================================ Risk report -->
+<main id="report" class="view view-report" hidden>
+  <header class="rep-header">
+    <div class="rep-brand">
+      <a href="/" class="logo logo-sm" data-nav aria-label="Previous AI, home">Previous<span>AI</span></a>
+      <a href="/" class="back" id="editLink" data-nav>&larr; Edit address</a>
+    </div>
+
+    <div class="rep-where">
+      <span class="addr"><span id="addrLine1"></span><br><span class="addr-2" id="addrLine2"></span></span>
+      <button type="button" class="avatar" id="householdBtn" aria-haspopup="dialog" aria-expanded="false"
+              aria-controls="householdPop" aria-label="Who lives here">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#F7F5EF" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="8" r="4"></circle><path d="M4 20c0-4.4 3.6-7 8-7s8 2.6 8 7"></path></svg>
+        <span class="avatar-badge" id="householdBadge" hidden></span>
+      </button>
+      <div class="popover glass-solid" id="householdPop" role="dialog" aria-labelledby="householdTitle" hidden>
+        <h3 id="householdTitle">Who lives here?</h3>
+        <p>Your action plan puts first what matters for them.</p>
+        <div class="chips" id="householdChips"></div>
+        <div class="popover-actions">
+          <button type="button" class="chip-btn ghost" id="householdClear">Clear</button>
+          <button type="button" class="chip-btn solid" id="householdApply">Update plan</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <section class="rep-main">
+    <article class="card media-card" id="mediaCard" aria-labelledby="mediaTitle">
+      <div class="card-head">
+        <h2 id="mediaTitle">Street view</h2>
+        <div class="card-head-right">
+          <span class="source" id="mediaSource">Google Street View</span>
+          <button type="button" class="head-btn" id="briefingBtn" hidden>
+            <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M2 1.2v7.6L8.6 5z" fill="currentColor"></path></svg>
+            Video briefing</button>
+          <button type="button" class="head-btn close" id="mediaClose" hidden aria-label="Back to street view">&times;</button>
+        </div>
+      </div>
+      <div class="media" id="media"></div>
+    </article>
+
+    <article class="card risks-card" aria-labelledby="risksTitle">
+      <div class="card-head">
+        <h2 id="risksTitle">Risks nearby</h2>
+        <span class="source" id="risksStatus" aria-live="polite"></span>
+      </div>
+      <div class="risk-list scroll" id="riskList"></div>
+    </article>
+  </section>
+
+  <section class="rep-bottom">
+    <article class="card history-card" aria-labelledby="historyTitle">
+      <h2 id="historyTitle">Historic</h2>
+      <div class="history scroll" id="history"></div>
+    </article>
+
+    <article class="card plan-card" aria-labelledby="planTitle">
+      <div class="card-head">
+        <h2 id="planTitle">Action plan</h2>
+        <div class="tabs" id="planTabs" role="tablist" aria-label="Plans"></div>
+      </div>
+      <div class="plan" id="plan"></div>
+    </article>
+  </section>
+
+  <footer class="rep-foot" id="repFoot"></footer>
+</main>
+
+<script src="/vendor/leaflet/leaflet.js" defer></script>
+<script type="module" src="/assets/js/main.js"></script>
+</body>
+</html>

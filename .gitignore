@@ -1,0 +1,29 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Secrets
+.env
+
+# Runtime cache of every external answer (rebuilt on demand; warm it with
+# backend/scripts/prewarm.py).
+data/cache/
+
+# Narrated briefings: rendered on demand from each report.
+data/media/briefings/
+
+# fal.ai full-size originals (the web clips, posters, stills and manifest ARE versioned).
+data/media/illustrations/raw/
+
+# Raw downloads of the batch pipelines (the built layers ARE versioned).
+data/catalonia/raw/
+data/cds/*.nc
+data/cds/*.zip
+data/cds/hazards/
+data/cds/*.log
+data/cds/jobs.json
+data/cds/pending.json
+
+# Autonomous layer runtime state (run records in data/autonomy/runs/ are kept).
+data/autonomy/queue.json

@@ -189,8 +189,8 @@ def hazard_avalanche(icgc: dict | None, terrain: dict | None,
         return None, None, False
     if terrain["max_slope_deg"] < AVALANCHE_MIN_DEG:
         return None, (f"Avalanches: no slope of {AVALANCHE_MIN_DEG}° or more within "
-                      f"{terrain['radius_m'] / 1000:g} km (steepest {terrain['max_slope_deg']:.0f}°, "
-                      f"Copernicus DEM), so they do not apply here."), True
+                      f"{terrain['radius_m'] / 1000:g} km (the steepest is {terrain['max_slope_deg']:.0f}°), "
+                      f"so they do not apply here."), True
     if not snow:
         return None, (f"Avalanches: there are slopes of {terrain['max_slope_deg']:.0f}° within "
                       f"{terrain['radius_m'] / 1000:g} km, but the snowfall record could not be "
