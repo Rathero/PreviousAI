@@ -1,7 +1,8 @@
 // The risk report: a sentence that sums the home up, the four risks, what already
 // happened near it and the plan to prepare. Picking a risk shows its story and its
 // first steps, and turns the background to its colours. A second page, "What this home
-// needs", turns the plan's shopping steps into a kit of real products.
+// needs", turns the plan's shopping steps into a kit of real products; a third, the
+// Advanced Kit, is step two: what keeps working when the services stop.
 
 import { api } from "./api.js";
 import { media } from "./media.js";
@@ -13,6 +14,7 @@ const FIRST_STEPS = 3;
 const KIT_SIZE = 4;
 const TAGS = { wildfire: "Fire", flood: "Flood", heat: "Heat", avalanche: "Avalanche", emergency: "Emergency" };
 const COUNT = ["", "One thing", "Two things", "Three things", "Four things"];
+const WORDS = ["", "One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten"];
 const CHECKABLE = new Set(["before", "buy", "first"]);
 const PROGRESS = [
   "Reading decades of daily climate records…",
@@ -70,7 +72,7 @@ let token = 0;
 let abort = null;
 let active = null;       // the risk picked on the page
 let horizon = "today";   // the risks as they are today, or around 2050
-let page = "risks";      // "risks", or "shop": what this home needs
+let page = "risks";      // "risks"; "shop", what this home needs; or "kit", the Advanced Kit
 let activePlan = "emergency";
 let progressTimer = null;
 let householdDraft = [];
@@ -623,7 +625,7 @@ function queryString() {
   }).filter(([, v]) => v !== "" && v != null)).toString();
 }
 
-function pageHref(target) { return `/${target === "shop" ? "shop" : "report"}?${queryString()}`; }
+function pageHref(target) { return `/${{ shop: "shop", kit: "kit" }[target] || "report"}?${queryString()}`; }
 
 function haveKey() { return `pai:have:${addressKey(params.address)}`; }
 function owned() { return new Set(store.get(haveKey(), [])); }
@@ -751,16 +753,101 @@ function toggleHave(id) {
   if (again) again.focus();
 }
 
+// ------------------------------------------------------------------ the Advanced Kit
+// Step two, the same for every home: what keeps working with no power, no network and no
+// shop open. Its items come from the report's catalogue; buying it opens them store by store.
+let advFocus = null;
+
+function advancedKit() { return (data && data.advanced_kit) || null; }
+
+function advItemHtml(item) {
+  return `
+    <article class="pv-card adv-item">
+      <div class="adv-shot"><img src="${esc(item.image)}" alt="${esc(item.alt)}" loading="lazy" decoding="async"></div>
+      <div class="adv-body"><h3>${esc(item.name)}</h3><p>${esc(item.what)}</p></div>
+      <div class="prod-price"><b>${EUROS.format(item.price)}</b><span>${esc(item.store)}</span></div>
+      <a class="prod-buy adv-buy" href="${esc(item.url)}" target="_blank" rel="noopener sponsored">View at the store ↗</a>
+    </article>`;
+}
+
+function renderKit() {
+  const kit = advancedKit();
+  if (!kit) {
+    $("#advLead").textContent = "";
+    setHtml($("#advGrid"), "");
+    $("#advNote").textContent = "";
+    return;
+  }
+  const n = kit.items.length;
+  const many = WORDS[n] || String(n);
+  $("#advLead").textContent = `${many} things that keep working with no electricity, no phone network and no `
+    + "shop open. After a big fire or flood, that is the first 72 hours.";
+  setHtml($("#advGrid"), kit.items.map(advItemHtml).join("") + `
+    <div class="adv-summary">
+      <div class="adv-summary-head">
+        <span class="adv-summary-title">The whole Advanced Kit</span>
+        <span class="adv-summary-text">${esc(many)} items across ${esc((WORDS[kit.stores] || String(kit.stores)).toLowerCase())}
+          stores, in one list you can shop at your own pace.</span>
+      </div>
+      <div class="adv-summary-foot">
+        <div class="adv-total"><b>${EUROS_ROUND.format(kit.total)}</b><span>in total</span></div>
+        <button type="button" class="adv-cta" data-adv-buy>Buy the kit</button>
+      </div>
+    </div>`);
+  $("#advNote").textContent = `Indicative prices (${kit.priced}); the store's own price is the one that counts. `
+    + `Store links are affiliate links: Previous AI earns a commission and you pay the same price. ${kit.note}`;
+}
+
+function openAdv() {
+  const kit = advancedKit();
+  if (!kit) return;
+  const stores = [];
+  kit.items.forEach((item) => {
+    let s = stores.find((x) => x.name === item.store);
+    if (!s) { s = { name: item.store, items: [] }; stores.push(s); }
+    s.items.push(item);
+  });
+  setHtml($("#advStores"), `
+    <p class="plan-note">Each store sells its part of the kit: open each item at its store to buy it.</p>
+    ${stores.map((s) => `
+      <section class="adv-store">
+        <div class="adv-store-head"><h3>${esc(s.name)}</h3>
+          <span>${s.items.length} item${s.items.length > 1 ? "s" : ""} · ${EUROS.format(s.items.reduce((t, i) => t + i.price, 0))}</span></div>
+        <ul>${s.items.map((i) => `
+          <li><span class="adv-store-item">${esc(i.name)}</span><b>${EUROS.format(i.price)}</b>
+            <a class="plain-link" href="${esc(i.url)}" target="_blank" rel="noopener sponsored">View ↗</a></li>`).join("")}</ul>
+      </section>`).join("")}`);
+  advFocus = document.activeElement;
+  $("#advDialog").hidden = false;
+  document.body.classList.add("modal-open");
+  setTimeout(() => $("#advClose").focus(), 0);
+}
+
+function closeAdv() {
+  if ($("#advDialog").hidden) return;
+  $("#advDialog").hidden = true;
+  if ($("#viewer").hidden && $("#planDialog").hidden && $("#grantsDialog").hidden) {
+    document.body.classList.remove("modal-open");
+  }
+  if (advFocus && document.contains(advFocus)) advFocus.focus();
+}
+
 function showPage(next) {
-  page = next === "shop" ? "shop" : "risks";
+  page = ["shop", "kit"].includes(next) ? next : "risks";
   $("#report").dataset.page = page;
   $("#risksPage").hidden = page !== "risks";
   $("#shopPage").hidden = page !== "shop";
+  $("#kitPage").hidden = page !== "kit";
+  $("#advancedLink").setAttribute("href", pageHref("kit"));
   const back = $("#editLink");
   if (page === "shop") {
     back.textContent = "← Back to your risks";
     back.setAttribute("href", pageHref("risks"));
     renderShop();
+  } else if (page === "kit") {
+    back.textContent = "← Back to the basics";
+    back.setAttribute("href", pageHref("shop"));
+    renderKit();
   } else {
     back.textContent = "← Edit address";
     back.setAttribute("href",
@@ -870,6 +957,7 @@ async function loadReport({ keep = false } = {}) {
     renderDetail();
     renderFooter();
     renderShop();
+    renderKit();
     $("#horizon").hidden = !data.ahead;
     $("#pdfBtn").disabled = pdfBusy;
     const illustrated = (data.risks || []).filter((r) => r.illustration).sort((a, b) => b.score - a.score);
@@ -994,6 +1082,16 @@ export function initReport(appRef) {
 
   $("#pdfBtn").addEventListener("click", sharePdf);
 
+  $("#kitPage").addEventListener("click", (e) => {
+    if (e.target.closest("[data-adv-buy]")) openAdv();
+  });
+  $("#advDialog").addEventListener("click", (e) => {
+    if (e.target.closest("[data-close]")) closeAdv();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("#advDialog").hidden) closeAdv();
+  });
+
   $("#shopPage").addEventListener("click", (e) => {
     const have = e.target.closest("[data-have]");
     if (have) { toggleHave(have.dataset.have); return; }
@@ -1027,9 +1125,10 @@ export function showReport(search, target = "risks") {
     floor: search.get("floor") ?? "",
     who: (search.get("who") || "").split(",").filter((k) => PROFILES.some(([p]) => p === k)),
   };
-  // Moving between the two pages of the same report keeps what is loaded.
+  // Moving between the pages of the same report keeps what is loaded.
   if (params && JSON.stringify(params) === JSON.stringify(next) && (data || token)) {
     closePlan();
+    closeAdv();
     showPage(target);
     return;
   }
@@ -1047,6 +1146,7 @@ export function showReport(search, target = "risks") {
   $("#repFoot").textContent = "";
   openHousehold(false);
   closePlan();
+  closeAdv();
   $("#pdfBtn").disabled = true;
   $("#pdfLabel").textContent = "PDF report";
   const h = app && app.health;

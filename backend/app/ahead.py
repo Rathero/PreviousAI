@@ -260,12 +260,9 @@ def build(report: dict, tiles: list[dict]) -> dict:
     for key, risk in risks.items():
         risk.setdefault("title", STORY_TITLES[key])
     growing = [r["phrase"] for k, r in risks.items() if r.get("direction") == "up" and r.get("phrase")]
-    if growing:
-        title = f"By 2050, {_join(growing)} {'is' if len(growing) == 1 else 'are'} projected to grow here."
-    else:
-        title = "By 2050, the climate models project little change here."
-    text = ("What climate models project if emissions stay high. The scores, the official maps "
-            "and past events describe today and do not change. Pick a risk for its numbers.")
+    # Short enough to take no more lines than today's title, so the page keeps its height.
+    title = f"By 2050: more {_join(growing)}." if growing else "By 2050: little change here."
+    text = "What climate models project if emissions stay high."
     highlights = [h for h in (_highlight(k, risks[k]) for k in ("wildfire", "flood", "heat")) if h]
     return {"title": title, "text": text, "risks": risks, "highlights": highlights,
             "scenario": SCENARIO_NOTE}

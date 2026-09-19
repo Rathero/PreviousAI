@@ -11,7 +11,10 @@
         "--app-dir",
         "backend",
         "--port",
-        "8000"
+        "8000",
+        "--reload",
+        "--reload-dir",
+        "backend"
       ],
       "port": 8000
     },
@@ -79,6 +82,20 @@
         "8004"
       ],
       "port": 8004
+    },
+    {
+      "name": "previous-ai-8005",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "-m",
+        "uvicorn",
+        "app.main:app",
+        "--app-dir",
+        "backend",
+        "--port",
+        "8005"
+      ],
+      "port": 8005
     }
   ]
 }

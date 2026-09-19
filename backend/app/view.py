@@ -11,7 +11,7 @@ from __future__ import annotations
 import datetime as dt
 import re
 
-from . import ahead, grants, protection
+from . import ahead, grants, products, protection
 from .hazards_official import ZONE_ORDER, ZONE_SHORT
 
 # The four risk tiles, in the order the app lays them out.
@@ -366,6 +366,7 @@ def app_view(report: dict) -> dict:
         "risks": tiles,
         "ahead": future,
         "grants": grants.for_report(report, tiles, future),
+        "advanced_kit": products.advanced_kit(),
         "history": history,
         "action_plan": report.get("action_plan"),
         "aerial": (report.get("map") or {}).get("aerial"),

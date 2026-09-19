@@ -603,6 +603,10 @@ if FRONTEND_DIR.exists():
     async def shop_page():
         return _page()
 
+    @app.get("/kit", include_in_schema=False)
+    async def kit_page():
+        return _page()
+
     @app.get("/favicon.ico", include_in_schema=False)
     async def favicon():
         return FileResponse(FRONTEND_DIR / "assets" / "img" / "favicon.svg", media_type="image/svg+xml")

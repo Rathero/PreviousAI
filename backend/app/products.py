@@ -10,6 +10,8 @@ Photos are the stores' own, loaded from their image servers at card size.
 
 from __future__ import annotations
 
+from urllib.parse import quote_plus
+
 # The day every link, price and photo below was checked on the store's own page.
 CHECKED = "2026-09-19"
 
@@ -223,3 +225,67 @@ PRODUCTS = {
         "image": _lm("media/1822787/media.jpg"),
     },
 }
+
+
+# --------------------------------------------------------------------------- #
+# The Advanced Kit: step two, once the basics are covered
+# --------------------------------------------------------------------------- #
+# The same seven things for every home: they keep working with no electricity, no phone
+# network and no shop open, the first 72 hours after a big fire or flood. Prices are
+# indicative; each link opens the store's search for the item, and the photos are the
+# app's own.
+KIT_STORES = {
+    "amazon": ("Amazon", "https://www.amazon.es/s?k={q}"),
+    "leroy_merlin": ("Leroy Merlin", "https://www.leroymerlin.es/search?q={q}"),
+    "decathlon": ("Decathlon", "https://www.decathlon.es/es/search?Ntt={q}"),
+}
+
+ADVANCED_KIT = [
+    {"id": "solar_charger", "name": "Solar charger, 20 W foldable",
+     "what": "Charges a phone from sunlight on day three of a blackout. IP67.",
+     "price": 49.90, "store": "amazon", "search": "cargador solar plegable 20W IP67",
+     "image": "solar-charger.jpg", "alt": "Foldable 20 W solar charger with a phone charging from it"},
+    {"id": "walkie_talkies", "name": "Walkie-talkies, pack of 2",
+     "what": "PMR446, no licence needed. Talk within a few kilometres with no network.",
+     "price": 59.90, "store": "amazon", "search": "walkie talkie PMR446 pack 2",
+     "image": "walkie-talkies.jpg", "alt": "Pair of PMR446 walkie-talkies with charging dock"},
+    {"id": "gas_stove", "name": "Portable gas stove with case",
+     "what": "Hot food and boiled water with no electricity and no gas supply.",
+     "price": 24.90, "store": "leroy_merlin", "search": "hornillo gas portatil maletin",
+     "image": "gas-stove.jpg", "alt": "Portable gas stove with its carrying case"},
+    {"id": "folding_shovel", "name": "Folding shovel multitool",
+     "what": "Digs, cuts and pries. Clears mud or a jammed door after a flood.",
+     "price": 29.95, "store": "decathlon", "search": "pala plegable",
+     "image": "folding-shovel.jpg", "alt": "Folding shovel multitool"},
+    {"id": "duct_tape", "name": "Heavy-duty duct tape, 4 rolls",
+     "what": "Seals a broken window, a leaking pipe or a gap under the door.",
+     "price": 19.90, "store": "leroy_merlin", "search": "cinta americana",
+     "image": "duct-tape.jpg", "alt": "Roll of black heavy-duty duct tape"},
+    {"id": "whistle", "name": "Aluminium survival whistle",
+     "what": "Carries much further than a shout, and never runs out of battery.",
+     "price": 6.95, "store": "decathlon", "search": "silbato emergencia",
+     "image": "whistle.jpg", "alt": "Aluminium survival whistle on a keyring"},
+    {"id": "faraday_bag", "name": "Faraday bag for phone and keys",
+     "what": "Blocks every radio signal in or out: no relay theft, no tracking.",
+     "price": 24.95, "store": "amazon", "search": "bolsa faraday movil llaves",
+     "image": "faraday-bag.jpg", "alt": "Faraday bag holding a car key and a V16 emergency beacon"},
+]
+KIT_IMAGES = "/assets/media/kit/"
+KIT_PRICED = "Spain, September 2026"
+KIT_NOTE = ("The gas stove needs butane cartridges, sold separately; use it in a ventilated room, "
+            "never in a closed one.")
+
+
+def advanced_kit() -> dict:
+    """The Advanced Kit as the app shows it: each item with its store and link, the total
+    and how many stores it takes."""
+    items = []
+    for item in ADVANCED_KIT:
+        store, search = KIT_STORES[item["store"]]
+        items.append({"id": item["id"], "name": item["name"], "what": item["what"],
+                      "price": item["price"], "store": store,
+                      "url": search.format(q=quote_plus(item["search"])),
+                      "image": KIT_IMAGES + item["image"], "alt": item["alt"]})
+    return {"items": items, "total": round(sum(i["price"] for i in items), 2),
+            "stores": len({i["store"] for i in ADVANCED_KIT}), "priced": KIT_PRICED, "note": KIT_NOTE}
+

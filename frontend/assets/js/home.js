@@ -1,6 +1,7 @@
 // The home address screen: address (typed, suggested or spoken), type of home and floor.
 
 import { api } from "./api.js";
+import { initReel } from "./reel.js";
 import { $, $$, esc, setHtml, debounce, store, REDUCED_MOTION } from "./util.js";
 
 let app = null;
@@ -162,6 +163,7 @@ function submit(e) {
 
 export function initHome(appRef) {
   app = appRef;
+  initReel($("#homeReel"));
   $$(".pill[data-kind]").forEach((b) => b.addEventListener("click", () => setKind(b.dataset.kind)));
   $("#homeForm").addEventListener("submit", submit);
 
