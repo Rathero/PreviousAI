@@ -118,7 +118,9 @@ async def _door_depth(client: httpx.AsyncClient, layer: str, lat: float, lon: fl
     resp = await client.get(WMS_URL, params={**base, "request": "GetMap", "format": "image/png",
                                              "transparent": "true"})
     resp.raise_for_status()
-    alpha = Image.open(io.BytesIO(resp.content)).convert("RGBA").getchannel("A").load()
+    # Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+    with Image.open(io.BytesIO(resp.content)) as img:
+        alpha = img.convert("RGBA").getchannel("A").load()
     centre, metres_per_px = (_DOOR_PX - 1) / 2, 2 * DOOR_RADIUS_M / _DOOR_PX
 
     def distance(p: tuple[int, int]) -> float:

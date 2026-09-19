@@ -65,6 +65,20 @@
         "backend"
       ],
       "port": 8003
+    },
+    {
+      "name": "previous-ai-8004",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "-m",
+        "uvicorn",
+        "app.main:app",
+        "--app-dir",
+        "backend",
+        "--port",
+        "8004"
+      ],
+      "port": 8004
     }
   ]
 }

@@ -5,7 +5,7 @@
 
 import { api } from "./api.js";
 import { media } from "./media.js";
-import { $, $$, esc, niceDate, PROFILES, store, homeLabel, addressKey } from "./util.js";
+import { $, $$, esc, setHtml, niceDate, PROFILES, store, homeLabel, addressKey } from "./util.js";
 
 const ORDER = ["wildfire", "flood", "heat", "avalanche"];
 const NAMES = { wildfire: "Fire", flood: "Flooding", heat: "Heat waves", avalanche: "Avalanches" };
@@ -197,8 +197,9 @@ function renderHero() {
 function heroError(message) {
   stopProgress();
   $("#heroTitle").textContent = "We could not analyse this address.";
-  $("#heroText").innerHTML = `${esc(message)} <a class="text-link"
-    href="/?address=${encodeURIComponent(params.address)}" data-nav>Edit the address</a>`;
+  // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+  setHtml($("#heroText"), `${esc(message)} <a class="text-link"
+    href="/?address=${encodeURIComponent(params.address)}" data-nav>Edit the address</a>`);
 }
 
 // ------------------------------------------------------------------ tiles
@@ -228,7 +229,8 @@ function tileHtml(key, risk) {
 
 function renderTiles() {
   const byKey = Object.fromEntries(((data && data.risks) || []).map((r) => [r.key, r]));
-  $("#tiles").innerHTML = ORDER.map((k) => tileHtml(k, byKey[k])).join("");
+  // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+  setHtml($("#tiles"), ORDER.map((k) => tileHtml(k, byKey[k])).join(""));
 }
 
 // ------------------------------------------------------------------ detail card
@@ -310,7 +312,8 @@ function renderDetail() {
   const risk = active && data && (data.risks || []).find((r) => r.key === active);
   el.dataset.view = !risk ? "summary" : risk.worth ? "risk" : "calm";
   if (!risk) el.innerHTML = summaryHtml();
-  else if (!risk.worth) el.innerHTML = calmHtml();
+  // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+  else if (!risk.worth) setHtml(el, calmHtml());
   else el.innerHTML = storyHtml(risk) + riskStepsHtml(risk);
   addMoney(el, risk);
 }
@@ -318,7 +321,8 @@ function renderDetail() {
 function detailLoading() {
   const col = [62, 88, 74, 80].map((w) => `<span class="skeleton-line" style="width:${w}%"></span>`).join("");
   $("#detail").dataset.view = "loading";
-  $("#detail").innerHTML = `<div class="col">${col}</div><div class="col">${col}</div>`;
+  // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+  setHtml($("#detail"), `<div class="col">${col}</div><div class="col">${col}</div>`);
 }
 
 function select(key) {
@@ -392,16 +396,18 @@ function renderFutureDetail() {
   const f = ahead(risk.key);
   if (!f.available && !(f.notes || []).length && !risk.worth) {
     el.dataset.view = "calm";
-    el.innerHTML = `<div class="calm"><h2>Nothing to prepare for here</h2><p>${esc(f.fact)}</p></div>`;
+    // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+    setHtml(el, `<div class="calm"><h2>Nothing to prepare for here</h2><p>${esc(f.fact)}</p></div>`);
     return;
   }
   el.dataset.view = "risk";
-  el.innerHTML = futureStoryHtml(risk.key) + (riskStepsHtml(risk) || `
+  // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+  setHtml(el, futureStoryHtml(risk.key) + (riskStepsHtml(risk) || `
     <div class="col">
       <h2>What to do first</h2>
       <p class="muted">Today this risk scores low here, so your plan has no steps for it yet.</p>
       <a class="more" href="${esc(pageHref("shop"))}" data-nav>See the full plan →</a>
-    </div>`);
+    </div>`));
   addMoney(el, risk);
 }
 
@@ -486,13 +492,14 @@ function renderGrants() {
   const gaps = (grantsFamily === "all" ? ORDER : [grantsFamily]).flatMap((k) =>
     (((g.families || {})[k] || {}).gaps || []).map((text) =>
       `<li><span class="dot" data-family="${esc(k)}" aria-hidden="true"></span><span>${esc(text)}</span></li>`));
-  $("#grants").innerHTML = `
+  // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+  setHtml($("#grants"), `
     ${g.intro ? `<p class="plan-note">${esc(g.intro)}</p>` : ""}
     ${families.length > 1 ? `<div class="tabs" role="tablist" aria-label="Risks">${tabs}</div>` : ""}
     ${groups || `<p class="muted">No public programme for this risk here yet.</p>`}
     ${gaps.length ? `<section class="grant-group"><h3>Not available here</h3>
       <ul class="grant-gaps">${gaps.join("")}</ul></section>` : ""}
-    ${g.note ? `<p class="plan-fine">${esc(g.note)}</p>` : ""}`;
+    ${g.note ? `<p class="plan-fine">${esc(g.note)}</p>` : ""}`);
 }
 
 function openGrants(key) {
@@ -557,11 +564,12 @@ function renderPlan() {
     return;
   }
   const note = plan.note ? `<p class="plan-note">${esc(plan.note)}</p>` : "";
-  $("#plan").innerHTML = `${note}<div class="phases" data-family="${esc(plan.key)}">${plan.phases.map((ph) => `
+  // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+  setHtml($("#plan"), `${note}<div class="phases" data-family="${esc(plan.key)}">${plan.phases.map((ph) => `
     <section class="phase" data-phase="${esc(ph.key)}">
       <h3>${esc(ph.label)}</h3>
       <ul>${ph.items.map((i) => planItemHtml(i, CHECKABLE.has(ph.key), done)).join("")}</ul>
-    </section>`).join("")}</div>${pricesNote(plan)}`;
+    </section>`).join("")}</div>${pricesNote(plan)}`);
 }
 
 let planFocus = null;
@@ -713,11 +721,14 @@ function renderShop() {
   $("#shopText").textContent = `${chosen} We earn a commission if you buy through these links — you pay the same price.`;
   $("#kitCount").textContent = `Your kit · ${missing.length} item${missing.length === 1 ? "" : "s"}`;
   $("#kitTotal").textContent = EUROS_ROUND.format(total);
-  $("#freeList").innerHTML = freeSteps().map((i) =>
-    `<li>${TICK_SVG}<span>${segmentsHtml(i.segments)}</span></li>`).join("");
-  $("#shopGrid").innerHTML = kit.map((p) => shopCardHtml(p, have.has(p.id))).join("");
+  // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+  setHtml($("#freeList"), freeSteps().map((i) =>
+    `<li>${TICK_SVG}<span>${segmentsHtml(i.segments)}</span></li>`).join(""));
+  // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+  setHtml($("#shopGrid"), kit.map((p) => shopCardHtml(p, have.has(p.id))).join(""));
   const service = serviceHtml();
-  $("#shopService").innerHTML = service;
+  // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+  setHtml($("#shopService"), service);
   $("#shopService").hidden = !service;
   const seen = (data.action_plan || {}).prices_seen;
   $("#shopNote").textContent = `${seen ? `Prices as seen on each store's page on ${niceDate(seen)}; they change. ` : ""}`

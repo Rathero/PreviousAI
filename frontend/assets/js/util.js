@@ -1,10 +1,22 @@
 // Small helpers shared by the views.
 
+import DOMPurify from "/vendor/dompurify/purify.es.js";
+
 export const $ = (sel, root = document) => root.querySelector(sel);
 export const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
 export const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) =>
   ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+// Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+// Puts a template's markup into an element. The template escapes its values with esc();
+// DOMPurify then drops whatever could still run (event handlers, javascript: links). It
+// keeps target on links and referrerpolicy on store photos, which it drops by default.
+const PURIFY = { ADD_ATTR: ["target", "referrerpolicy"] };
+
+export function setHtml(el, html) {
+  el.innerHTML = DOMPurify.sanitize(html, PURIFY);
+}
 
 export const REDUCED_MOTION = !!(window.matchMedia &&
   window.matchMedia("(prefers-reduced-motion: reduce)").matches);

@@ -40,6 +40,7 @@ from autonomy import gate  # noqa: E402
 from autonomy.tasks import TASKS  # noqa: E402
 
 POLL_S = 30
+GIT_TIMEOUT_S = 300    # a fetch or checkout of this repo takes seconds; a stalled one must not hang the run
 IDLE = {"finished", "waiting_for_user"}
 
 OUTPUT_SCHEMA = {
@@ -63,8 +64,10 @@ def log(msg: str) -> None:
 
 
 def git(*args: str, cwd: Path = ROOT) -> str:
+    # Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+    # A git call that stalls raises subprocess.TimeoutExpired instead of blocking forever.
     return subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True, check=True,
-                          encoding="utf-8").stdout.strip()
+                          encoding="utf-8", timeout=GIT_TIMEOUT_S).stdout.strip()
 
 
 def remote_sha(branch: str) -> str | None:
@@ -234,7 +237,9 @@ def loop(run: dict, attempt_timeout_s: int) -> dict:
     finally:
         try:
             git("worktree", "remove", "--force", str(base_tree))
-        except subprocess.CalledProcessError:
+        except subprocess.SubprocessError:
+            # Recommended by Norma — fixed with Claude Opus 5 via Claude Code: git() can time out
+            # now too, and that must not stop the temp dir below from being removed.
             pass
         shutil.rmtree(workdir, ignore_errors=True)
     return run
@@ -309,7 +314,13 @@ def main() -> int:
             v = gate.run(task_id, workdir / "target", base=base, base_tree=workdir / "base", log=log)
         finally:
             for p in ("target", "base"):
-                subprocess.run(["git", "worktree", "remove", "--force", str(workdir / p)], cwd=ROOT)
+                # Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+                # Best effort, as without check=: a stalled git does not stop the cleanup.
+                try:
+                    subprocess.run(["git", "worktree", "remove", "--force", str(workdir / p)], cwd=ROOT,
+                                   timeout=GIT_TIMEOUT_S)
+                except subprocess.TimeoutExpired:
+                    pass
             shutil.rmtree(workdir, ignore_errors=True)
         log("PASSED" if v["passed"] else f"REFUSED: {', '.join(v['failed'])}")
         return 0 if v["passed"] else 1

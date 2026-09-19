@@ -21,7 +21,9 @@ function setKind(next) {
 
 function message(text, isError = false) {
   const el = $("#addressMsg");
-  el.innerHTML = text || "";
+  // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+  // Plain text, never markup: callers pass their words unescaped.
+  el.textContent = text || "";
   el.classList.toggle("error", !!isError);
 }
 
@@ -96,10 +98,10 @@ async function sendRecording(blob) {
     const text = res.text.replace(/[.。]+$/, "");
     $("#address").value = text;
     $("#address").focus();
-    message(`Heard: “${esc(text)}”. Check it, then press See risks.`);
+    message(`Heard: “${text}”. Check it, then press See risks.`);
     fetchSuggestions(text);
   } catch (err) {
-    message(`Voice input failed: ${esc(err.message)}`, true);
+    message(`Voice input failed: ${err.message}`, true);
   } finally {
     setMic("idle");
   }

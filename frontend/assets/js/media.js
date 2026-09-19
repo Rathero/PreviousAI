@@ -5,7 +5,7 @@
 // without naming the provider.
 
 import { api } from "./api.js";
-import { $, esc, REDUCED_MOTION } from "./util.js";
+import { $, esc, setHtml, REDUCED_MOTION } from "./util.js";
 
 const PIN_SVG = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="rgba(247,245,239,0.55)"
   stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
@@ -99,7 +99,8 @@ function renderThumb() {
   }
   btn.disabled = false;
   if (street.available) {
-    el.innerHTML = `<img alt="" src="${esc(street.image)}">`;
+    // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+    setHtml(el, `<img alt="" src="${esc(street.image)}">`);
     const when = monthYear(street.date);
     label.textContent = when ? `Street View · ${when}` : "Street View";
     btn.setAttribute("aria-label", "Open the street view of the home");
@@ -113,7 +114,8 @@ function renderThumb() {
     label.textContent = "Aerial view";
     btn.setAttribute("aria-label", "Open the aerial view of the home");
   } else {
-    el.innerHTML = statusHtml("No picture of this address");
+    // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+    setHtml(el, statusHtml("No picture of this address"));
     label.textContent = "";
     btn.disabled = true;
   }
@@ -180,14 +182,15 @@ function renderIllustration(risk) {
     ? `<div class="media-switch" role="group" aria-label="Risks with an AI illustration">${previews.map((r) =>
       `<button type="button" data-switch="${esc(r.key)}" aria-pressed="${r.key === risk.key}">${esc(r.label)}</button>`).join("")}</div>`
     : "";
-  el.innerHTML = `
+  // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+  setHtml(el, `
     <video class="media-fill" ${REDUCED_MOTION ? "controls" : "autoplay loop"} muted playsinline preload="auto"
       poster="${esc(ill.poster || "")}" src="${esc(ill.video)}"
       aria-label="${esc(ill.title)}. AI illustration of a generic place"></video>
     <span class="media-badge">AI illustration · not this place</span>${others}
     <div class="media-caption"><b>${esc(ill.title)}.</b> ${esc(ill.caption)}
       ${risk.home_note ? `<span class="home-note">${esc(risk.home_note)}</span>` : ""}
-      <span class="fine">${chosen} ${esc(ill.limitation || "")}</span></div>`;
+      <span class="fine">${chosen} ${esc(ill.limitation || "")}</span></div>`);
 }
 
 async function runBriefing(ctx) {
@@ -233,7 +236,8 @@ async function runBriefing(ctx) {
         aria-label="Video briefing of this report"></video>`;
   } catch (err) {
     if (mine !== token) return;
-    el.innerHTML = `<div class="media-status error"><span>${esc(err.message)}</span></div>`;
+    // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+    setHtml(el, `<div class="media-status error"><span>${esc(err.message)}</span></div>`);
   } finally {
     if (mine === token) $("#briefingBtn").disabled = false;
   }
@@ -300,7 +304,8 @@ export const media = {
     openViewer();
     if (!place || !street) {
       header("Street view", "");
-      box().innerHTML = statusHtml("Finding your home…", { spinner: true });
+      // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+      setHtml(box(), statusHtml("Finding your home…", { spinner: true }));
       return;
     }
     if (street.available) renderStreet();
