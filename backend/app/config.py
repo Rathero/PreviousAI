@@ -94,7 +94,9 @@ FAL_EDIT_MODEL = _env("FAL_EDIT_MODEL", "fal-ai/nano-banana-2/edit")
 # but it puts the waterline where the prompt says.
 FAL_STRICT_EDIT_MODEL = _env("FAL_STRICT_EDIT_MODEL", "openai/gpt-image-2/edit")
 FAL_VIDEO_MODEL = _env("FAL_VIDEO_MODEL", "fal-ai/kling-video/v2.5-turbo/pro/image-to-video")
-FAL_TTS_MODEL = _env("FAL_TTS_MODEL", "fal-ai/elevenlabs/tts/turbo-v2.5")
+# Eleven v3 rather than Turbo v2.5: slower, but the briefing is rendered in the
+# background, and Turbo read it in a flat, robotic voice.
+FAL_TTS_MODEL = _env("FAL_TTS_MODEL", "fal-ai/elevenlabs/tts/eleven-v3")
 FAL_TTS_VOICE = _env("FAL_TTS_VOICE", "Brian")
 # ElevenLabs Scribe v2: fast, and it can be biased towards place names, so local
 # names come back spelt as the geocoders know them.

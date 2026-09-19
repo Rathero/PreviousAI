@@ -188,6 +188,9 @@ async def prices(endpoint_ids: list[str]) -> dict[str, dict]:
 # --- Narration (briefing.py) ---------------------------------------------------------
 def _tts_arguments(text: str, voice: str) -> dict:
     model = config.FAL_TTS_MODEL
+    if "eleven-v3" in model:
+        # v3 takes neither speed nor similarity_boost; 0.5 is its "natural" stability.
+        return {"text": text, "voice": voice, "stability": 0.5, "language_code": "en"}
     if "elevenlabs" in model:
         return {"text": text, "voice": voice, "stability": 0.6, "similarity_boost": 0.75,
                 "speed": 1.08, "language_code": "en"}

@@ -96,6 +96,13 @@ def spoken_place(report: dict) -> str:
     return muni.get("name") or "the selected point"
 
 
+def spoken_town(report: dict) -> str | None:
+    """The town alone, for the voice: the screen already shows the street, and a street
+    name in Catalan or Spanish is where an English voice stumbles."""
+    town = re.sub(r"^\d{4,5}\s+", "", spoken_place(report).rsplit(",", 1)[-1].strip())
+    return None if town == "the selected point" else town
+
+
 def _when(report: dict) -> str:
     if report.get("mode") != "travel":
         home = (report.get("dwelling") or {}).get("label")
@@ -106,6 +113,24 @@ def _when(report: dict) -> str:
         return f"for a trip from {a.day} {MONTHS_EN[a.month]} to {b.day} {MONTHS_EN[b.month]}"
     months = (report.get("window") or {}).get("months") or []
     return "for a trip in " + " and ".join(MONTHS_EN[m] for m in months)
+
+
+def _spoken_when(report: dict) -> str:
+    """_when as the voice says it, with the town: "for your house in El Masnou, covering
+    the whole year"."""
+    town = spoken_town(report)
+    if report.get("mode") != "travel":
+        home = (report.get("dwelling") or {}).get("label")
+        at = f" in {town}" if town else ""
+        return (f"for your {home.lower()}{at}, covering the whole year" if home
+                else f"for living{at} all year round")
+    to = f" to {town}" if town else ""
+    trip = (report.get("outlook") or {}).get("trip")
+    if trip:
+        a, b = (dt.date.fromisoformat(d) for d in trip)
+        return f"for your trip{to}, from {a.day} {MONTHS_EN[a.month]} to {b.day} {MONTHS_EN[b.month]}"
+    months = (report.get("window") or {}).get("months") or []
+    return f"for your trip{to} in " + " and ".join(MONTHS_EN[m] for m in months)
 
 
 def _shown(ind: dict) -> str:
@@ -149,7 +174,9 @@ _UNITS = [("°C", "degree", "degrees"), ("°", "degree", "degrees"), ("mm", "mil
 
 def speakable(text: str) -> str:
     """Written text -> what a voice should read ("1.58 m" -> "1.58 metres")."""
-    out = text
+    # Zeros after the point are only trimmed: "2.0 km" is said "2 kilometres", not
+    # "two point zero", and 1.58 stays 1.58.
+    out = re.sub(r"(\d)\.0+(?!\d)", r"\1", text)
     for sym, one, many in _UNITS:
         pattern = re.compile(r"(\d[\d,.]*)\s*" + re.escape(sym) + (r"(?![A-Za-z])" if sym[-1].isalpha() else ""))
         out = pattern.sub(lambda m: f"{m.group(1)} {one if m.group(1) in ('1', '1.0') else many}", out)
@@ -172,18 +199,139 @@ def _sentence(text: str) -> str:
     return text if text.endswith((".", "!", "?")) else text + "."
 
 
-def _what_to_do(report: dict, worst: dict | None) -> tuple[str, str] | None:
+def _lower_first(text: str) -> str:
+    """"Remove dry leaves" -> "remove dry leaves", to follow a lead-in; a word in
+    capitals ("FFP2") keeps them."""
+    word = text.split(" ", 1)[0]
+    return text[:1].lower() + text[1:] if word[1:] == word[1:].lower() else text
+
+
+def _n(count: str, one: str, many: str) -> str:
+    """"1 fire has", "6 fires have"."""
+    return f"{count} {one if count == '1' else many}"
+
+
+_REGIONAL = {"river": "river floods", "urban (rain)": "urban flooding from rain",
+             "coastal": "coastal floods"}
+
+
+def _regional(m: re.Match) -> str:
+    """"In Arizona: high river and high urban (rain) flooding" -> "In Arizona, the regional
+    flood hazard is high for river floods and high for urban flooding from rain"."""
+    said = []
+    for part in re.split(r", | and ", m[2]):
+        kind = next((k for k in _REGIONAL if part.endswith(" " + k)), None)
+        if not kind:
+            return m[0]
+        said.append(f"{part[:-len(kind) - 1]} for {_REGIONAL[kind]}")
+    return f"In {m[1]}, the regional flood hazard is " + (
+        said[0] if len(said) == 1 else ", ".join(said[:-1]) + " and " + said[-1])
+
+
+# The card headlines are captions, written for the screen: "6 mapped fires within 5 km
+# since 1986; the nearest, from 1994, 2.0 km away". Read aloud, a caption sounds like a
+# list being read, so the voice says the same figures inside sentences. Each rule
+# matches one headline template in hazards*.py and changes only the words around the
+# figures; <S>/<s> is the home or the place. A headline no rule knows (a template that
+# changed) is read as it is.
+_SPOKEN = [(re.compile(pattern), repl) for pattern, repl in [
+    # Fires on record (fire_history)
+    (r"^The point lies inside the perimeter of a (\d{4}) fire \(([^)]+)\)",
+     r"<S> lies inside the perimeter of a \1 fire that burned \2"),
+    (r"^(\d+) mapped fires? within (\S+ k?m) since (\d{4}); the nearest, from (\d{4}), (\S+ k?m) away",
+     lambda m: f"Since {m[3]}, {_n(m[1], 'fire has', 'fires have')} been mapped within {m[2]} "
+               f"of <s>, and the nearest one, in {m[4]}, was {m[5]} away"),
+    (r"^No mapped fire within (\S+ k?m) since (\d{4})",
+     r"No fire has been mapped within \1 of <s> since \2"),
+    # Fire weather (wildfire)
+    (r"^(\d+ days?|Less than one day) a year with fire-prone weather",
+     lambda m: f"There {'is' if m[1].endswith('day') else 'are'} {_lower_first(m[1])} a year "
+               f"of fire-prone weather"),
+    (r"^(Less than 1 %|\d+ %) of days in (.+?) with fire-prone weather",
+     r"\1 of days in \2 have fire-prone weather"),
+    (r"; by (\d{4}-\d{4}) \(RCP8\.5\) (\d+) more days a year of high danger \(FWI > 30\) "
+     r"are projected",
+     r". By \1, under a high-emissions scenario, \2 more days a year of high fire danger "
+     r"are projected"),
+    # Heat
+    (r"^(\d+ days?|Less than one day) a year above (\d+) degrees",
+     lambda m: f"It goes above {m[2]} degrees on {_lower_first(m[1])} a year"),
+    (r"^(Less than 1 %|\d+ %) of days in (.+?) above (\d+) degrees",
+     lambda m: f"It goes above {m[3]} degrees on {_lower_first(m[1])} of days in {m[2]}"),
+    (r"; (\d+) tropical nights a year \(the night never cools below ([^)]+)\)",
+     r", and there are \1 tropical nights a year, when the night never cools below \2"),
+    (r"; (\d+ in 10 nights never cool)", r", and \1"),
+    # Official flood zones and avalanche zones (the zone's code is not read out)
+    (r"^Inside a mapped (.+?) \([^)]*\)", r"<S> is inside a mapped \1"),
+    (r"^Inside the (.+?) \(water depth ([^)]+)\)", r"<S> is inside the \1, with a water depth of \2"),
+    (r"^Inside the ", r"<S> is inside the "),
+    (r"; also in the ", r", and also in the "),
+    (r"^Outside the ", r"<S> is outside the "),
+    # Recorded floods, sea level, regional flooding
+    (r"^No flood episodes recorded in (.+?) \((\d{4})-(\d{4})\)",
+     r"No flood episodes were recorded in \1 between \2 and \3"),
+    (r"^Under water with ", r"<S> would be under water with "),
+    (r"^Under water if the sea rises ", r"<S> would be under water if the sea rose "),
+    (r"^In (.+?): (.+) flooding$", _regional),
+    # Avalanches
+    (r"^Nearest mapped avalanche zone (\S+ k?m) away", r"The nearest mapped avalanche zone is \1 away"),
+    (r"^No mapped avalanche zone within ", r"There is no mapped avalanche zone within "),
+    (r"; (\d+) avalanches? observed within (\S+ k?m)((?: since \d{4})?)",
+     lambda m: f". {_n(m[1], 'avalanche has', 'avalanches have')} been observed within {m[2]}{m[3]}"),
+    (r"; (\d+) avalanches? recalled by local people within (\S+ k?m)",
+     lambda m: f", and local people recall {_n(m[1], 'avalanche', 'avalanches')} within {m[2]}"),
+    (r"; (\S+ cm) of snow in a typical year", r". A typical year brings \1 of snow"),
+    (r"^Slopes of up to (.+?) and (.+?) of snowfall a year: avalanche terrain, with no official "
+     r"avalanche map here",
+     r"With slopes of up to \1 and \2 of snowfall a year, this is avalanche terrain, though "
+     r"there is no official avalanche map here"),
+]]
+
+
+def spoken_headline(headline: str, subject: str) -> str:
+    """A card's headline as the voice says it (see _SPOKEN)."""
+    for pattern, repl in _SPOKEN:
+        headline = pattern.sub(repl, headline, count=1)
+    return headline.replace("<S>", subject[:1].upper() + subject[1:]).replace("<s>", subject)
+
+
+def _risk_lead(risk: dict, i: int, count: int, previous: dict | None) -> str:
+    """"Fire is a moderate risk here, at 52 out of 100.": each score is said once, in its
+    own scene, and each scene follows on from the one before."""
+    verb = "are" if risk["key"] in view.PLURAL else "is"
+    score = f"a {risk['level']} risk"
+    if i == 0:
+        return f"{risk['label']} {verb} {score} here, at {risk['score']} out of 100."
+    also = " also" if previous and previous["level"] == risk["level"] else ""
+    lead = "And" if i == count - 1 else "Next,"
+    return f"{lead} {risk['label'].lower()} {verb}{also} {score}, at {risk['score']} out of 100."
+
+
+def _spoken_indicator(ind: dict, figure: str) -> str:
+    """A figure the headline does not say: the river's water depth as a sentence, any
+    other as "label: value"."""
+    period = re.search(r"(\d+)-year flood", ind.get("label") or "")
+    if ind.get("key") == "flood_depth_fluvial" and period:
+        return f"In a {period[1]}-year flood, the river water here would be {figure} deep."
+    return f"{ind['label']}: {figure}."
+
+
+def _what_to_do(report: dict, worst: dict | None) -> tuple[str, str, str] | None:
     """The advice the video reads, from the report's action plan: the household's first
-    measure when one was ranked for it, else the first steps before the worst risk."""
+    measure when one was ranked for it, else the first steps before the worst risk.
+    Returns (label, text on screen, what the voice says)."""
     plan = report.get("action_plan") or {}
     household = [a for a in plan.get("household") or [] if isinstance(a, dict) and a.get("text")]
     if household:
-        return "For your household", _sentence(household[0]["text"])
+        text = _sentence(household[0]["text"])
+        return "For your household", text, f"One tip for your household. {text}"
     hazard = next((p for p in plan.get("plans", []) if worst and p.get("key") == worst["key"]), None)
     before = next((ph for ph in (hazard or {}).get("phases", []) if ph["key"] == "before"), None)
     if before and before["items"]:
         steps = ["".join(seg["text"] for seg in item["segments"]) for item in before["items"][:2]]
-        return before["label"], " ".join(_sentence(step) for step in steps)
+        text = " ".join(_sentence(step) for step in steps)
+        # "Before a wildfire, remove dry leaves..."
+        return before["label"], text, f"{before['label']}, {_lower_first(text)}"
     return None
 
 
@@ -203,9 +351,13 @@ def build_script(report: dict) -> list[Scene]:
         return next(((cards[c["key"]].get("illustration") or {}).get("id") for c in risk["cards"]
                      if cards[c["key"]].get("illustration")), None)
 
-    intro = f"Previous AI report for {place}, {_when(report)}."
+    # The voice says the town and the risk; the scores come one per scene.
+    intro = f"This is your Previous AI report {_spoken_when(report)}."
     if worst:
-        intro += f" The highest risk here: {worst['label'].lower()}, {worst['score']} out of 100."
+        when = "for these dates" if report.get("mode") == "travel" else "here"
+        intro += f" The biggest risk {when} comes from {worst['label'].lower()}."
+    subject = ("your home" if report.get("mode") != "travel" and report.get("dwelling")
+               else "this place")
     scenes = [Scene(
         kind="intro", title=place, kicker="Previous AI · natural hazard report",
         caption=f"Flooding, wildfire, avalanches and extreme heat, {_when(report)}.",
@@ -213,16 +365,17 @@ def build_script(report: dict) -> list[Scene]:
         figure_label=f"{worst['label'].lower()} · {worst['level']}" if worst else "",
         level=(worst or {}).get("level"), tint=FAMILY_RGB.get((worst or {}).get("key")),
         illustration=next((c for c in map(clip, shown + risks) if c), None),
-        say=intro,
+        say=speakable(intro),
     )]
 
     # What the flood map means for this home (its floor), said with the flood scene.
     home_note = ((report.get("dwelling") or {}).get("notes") or {}).get("flood")
-    for risk in shown:
+    for i, risk in enumerate(shown):
         h = cards[risk["cards"][0]["key"]]
         ind = key_indicator(h)
         figure = _shown(ind) if ind else ""
-        say = f"{risk['label']}: {risk['level']}, {risk['score']} out of 100. {_sentence(h['headline'])}"
+        headline = _sentence(spoken_headline(h["headline"], subject))
+        say = f"{_risk_lead(risk, i, len(shown), shown[i - 1] if i else None)} {headline}"
         # The figure is said only when nothing else says it: the headline is written
         # from the primary metric ("brings 44 mm"), so repeating it ("44.4 mm") only adds
         # seconds, and a bare "Yes" adds nothing. The flood depth is not in the headline,
@@ -232,8 +385,11 @@ def build_script(report: dict) -> list[Scene]:
         if (ind and figure and not note and ind.get("key") != h.get("primary_metric")
                 and not figure.startswith(("Yes", "No"))
                 and not (number and number.group(0) in h["headline"])):
-            say += f" {ind['label']}: {figure}."
+            say += f" {_spoken_indicator(ind, figure)}"
         if note:
+            # "Your home is inside the zone. Your home is at street level" -> "It is..."
+            if headline.startswith("Your home ") and note.startswith("Your home "):
+                note = "It " + note[len("Your home "):]
             say += f" {_sentence(note)}"
         scenes.append(Scene(
             kind="hazard", kicker=f"{risk['label']} · {risk['level']} · {risk['score']}%",
@@ -245,11 +401,11 @@ def build_script(report: dict) -> list[Scene]:
 
     tip = _what_to_do(report, worst)
     if tip:
-        about, text = tip
+        about, text, said = tip
         scenes.append(Scene(
             kind="advice", kicker="What to do about it", caption=text,
             figure_label=about, level=None,
-            say=speakable(f"{about}: {text}"),
+            say=speakable(said),
         ))
 
     glance = [f"{r['label']}: {r['score']}%" for r in sorted(
@@ -257,8 +413,8 @@ def build_script(report: dict) -> list[Scene]:
     scenes.append(Scene(
         kind="closing", title="Your home at a glance", lines=glance,
         caption="The full report shows what each value means and what it does not say.",
-        say=("The full report shows what each value means and what it does not say. The pictures "
-             "are AI illustrations, not this place."),
+        say=("The full report explains what each value means, and what it does not say. And "
+             "remember, the pictures are AI illustrations, not this place."),
     ))
     return scenes
 

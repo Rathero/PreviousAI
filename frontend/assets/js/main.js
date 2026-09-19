@@ -1,6 +1,6 @@
 // Entry point: two views, one page. "/" asks for the home; "/report?address=..." shows its
-// risks, "/shop?address=..." what it needs and "/kit?address=..." the Advanced Kit, all from
-// the same report.
+// risks, "/shop?address=..." what it needs and "/kit?address=..." the basic emergency kit,
+// all from the same report.
 
 import { api } from "./api.js";
 import { initHome, showHome } from "./home.js";
@@ -23,7 +23,7 @@ function route() {
   if (page && url.searchParams.get("address")) {
     home.hidden = true;
     report.hidden = false;
-    const prefix = { shop: "What this home needs · ", kit: "Advanced Kit · " }[page] || "";
+    const prefix = { shop: "What this home needs · ", kit: "Basic emergency kit · " }[page] || "";
     document.title = `${prefix}${url.searchParams.get("address")} · Previous AI`;
     showReport(url.searchParams, page);
   } else {

@@ -45,7 +45,7 @@ def build(report: dict) -> dict:
         losses = _eur(e.get("losses_eur") or parse_losses(e.get("losses_raw")))
         if losses:
             parts.append(f"{losses} in losses across the episode")
-        items.append({"date": e.get("date"), "family": "flood",
+        items.append({"date": e.get("date"), "family": "flood", "kind": "flood_episode",
                       "title": "Flood episode in the municipality",
                       "detail": " · ".join(parts) or None,
                       "source": "AGORA · University of Barcelona", "url": e.get("report_url")})
@@ -56,21 +56,25 @@ def build(report: dict) -> dict:
         where = "it reached this point" if f.get("inside") else _distance(f.get("distance_m"))
         muni = f.get("municipality")
         items.append({"date": f.get("date") or str(f.get("year")), "family": "wildfire",
+                      "kind": "mapped_fire",
                       "title": f"Wildfire of {f['area_ha']:,.0f} ha" if f.get("area_ha") else "Wildfire",
                       "detail": " · ".join(x for x in (where, muni) if x) or None,
                       "source": "Government of Catalonia · wildfire perimeters"})
 
     for f in (events.get("satellite_fires") or [])[:MAX_PER_KIND]:
-        bits = [f"{f['distance_km']:.1f} km away", f"{f['detections']} satellite detections"]
+        bits = [f"{f['distance_km']:.1f} km away",
+                f"{f['detections']} satellite detection{'s' if f['detections'] != 1 else ''}"]
         if f.get("area_ha"):
             bits.append(f"~{f['area_ha']:,.0f} ha")
         items.append({"date": (f.get("first") or "")[:10] or None, "family": "wildfire",
+                      "kind": "satellite_fire",
                       "title": "Fire detected by satellite", "detail": " · ".join(bits),
                       "source": "Deepfire (satellite detections; can include farm burns)"})
 
     avalanches = sorted(events.get("avalanches") or [], key=lambda a: a.get("year") or 0, reverse=True)
     for a in avalanches[:MAX_PER_KIND]:
         items.append({"date": str(a["year"]) if a.get("year") else None, "family": "avalanche",
+                      "kind": "avalanche",
                       "title": "Avalanche observed",
                       "detail": "it reached this point" if a.get("inside") else _distance(a.get("distance_m")),
                       "source": "ICGC · Catalan avalanche database"})
@@ -78,13 +82,13 @@ def build(report: dict) -> dict:
     since = ((report.get("window") or {}).get("full_record") or "").split("-")[0] or "1979"
     hottest = (events.get("hottest_days") or [None])[0]
     if hottest:
-        items.append({"date": hottest["date"], "family": "heat",
+        items.append({"date": hottest["date"], "family": "heat", "kind": "hottest_day",
                       "title": f"Hottest day since {since}: {hottest['value']:.1f} °C",
                       "detail": "daily maximum over the ~9 km climate cell",
                       "source": "ERA5 reanalysis (Copernicus)"})
     wettest = (events.get("wettest_days") or [None])[0]
     if wettest:
-        items.append({"date": wettest["date"], "family": "flood",
+        items.append({"date": wettest["date"], "family": "flood", "kind": "wettest_day",
                       "title": f"Wettest day since {since}: {wettest['value']:.0f} mm of rain",
                       "detail": "daily total over the ~9 km climate cell",
                       "source": "ERA5 reanalysis (Copernicus)"})

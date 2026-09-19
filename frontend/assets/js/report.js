@@ -1,16 +1,18 @@
-// The risk report: a sentence that sums the home up, the four risks, what already
-// happened near it and the plan to prepare. Picking a risk shows its story and its
-// first steps, and turns the background to its colours. A second page, "What this home
-// needs", turns the plan's shopping steps into a kit of real products; a third, the
-// Advanced Kit, is step two: what keeps working when the services stop.
+// The risk report: a sentence that sums the home up, the four risks, the plan to prepare
+// and the basic emergency kit. Picking a risk shows its first steps and the products to
+// buy for it, and turns the background to its colours. "Before" turns the page to what
+// already happened near the home, and "2050" to how the climate behind each risk changes.
+// A second page, "What this home needs", turns the plan's shopping steps into a kit of
+// real products; a third, the basic emergency kit: what keeps working when the services stop.
 
 import { api } from "./api.js";
 import { media } from "./media.js";
-import { $, $$, esc, setHtml, niceDate, PROFILES, store, homeLabel, addressKey } from "./util.js";
+import { $, $$, esc, setHtml, niceDate, PROFILES, store, homeLabel, addressKey, debounce } from "./util.js";
 
 const ORDER = ["wildfire", "flood", "heat", "avalanche"];
 const NAMES = { wildfire: "Fire", flood: "Flooding", heat: "Heat waves", avalanche: "Avalanches" };
-const FIRST_STEPS = 3;
+const PLAN_STEPS = 6;    // the plan's steps in the card under the risks, as many as fit
+const SHOP_ROWS = 4;     // the products beside them, as many as fit
 const KIT_SIZE = 4;
 const TAGS = { wildfire: "Fire", flood: "Flood", heat: "Heat", avalanche: "Avalanche", emergency: "Emergency" };
 const COUNT = ["", "One thing", "Two things", "Three things", "Four things"];
@@ -71,8 +73,8 @@ let located = null;      // the point the address resolved to
 let token = 0;
 let abort = null;
 let active = null;       // the risk picked on the page
-let horizon = "today";   // the risks as they are today, or around 2050
-let page = "risks";      // "risks"; "shop", what this home needs; or "kit", the Advanced Kit
+let horizon = "today";   // "before", what already happened; the risks "today"; or around "2050"
+let page = "risks";      // "risks"; "shop", what this home needs; or "kit", the basic emergency kit
 let activePlan = "emergency";
 let progressTimer = null;
 let householdDraft = [];
@@ -138,8 +140,8 @@ function pricesNote(plan) {
     ${niceDate(seen)}; they change.</p>`;
 }
 
-// The three steps of the summary: the emergency numbers, the first step against the
-// worst risk, then the alerts; the other risks' first steps if there is room.
+// The steps of the summary: the emergency numbers, the first step against the worst risk,
+// then the alerts; then the other risks' first steps and the rest of the emergency plan.
 function summarySteps() {
   const all = plans();
   const emergency = all.find((p) => p.key === "emergency");
@@ -151,7 +153,7 @@ function summarySteps() {
   add(emergency && emergency.items[0]);
   hazards.slice(1).forEach((h) => add(checkable(h)[0]));
   ((emergency && emergency.items) || []).slice(2).forEach(add);
-  return picks.slice(0, FIRST_STEPS);
+  return picks.slice(0, PLAN_STEPS);
 }
 
 // ------------------------------------------------------------------ header
@@ -192,7 +194,8 @@ function heroLoading() {
 
 function renderHero() {
   stopProgress();
-  const head = horizon === "2050" && data.ahead ? data.ahead : data.headline;
+  const head = horizon === "2050" && data.ahead ? data.ahead
+    : horizon === "before" && data.past ? data.past : data.headline;
   $("#heroTitle").textContent = head.title;
   $("#heroText").textContent = head.text;
 }
@@ -216,6 +219,7 @@ function tileIcon(key) {
 
 function tileHtml(key, risk) {
   if (risk && horizon === "2050" && data && data.ahead) return futureTileHtml(key, risk);
+  if (risk && horizon === "before" && data && data.past) return pastTileHtml(key, risk);
   const loading = !risk;
   const score = risk ? risk.score : null;
   const value = score == null ? "—" : `${score}%`;
@@ -243,7 +247,7 @@ function whenLabel(when) {
 
 function stepHtml(item, done) {
   const id = `step-${item.id}`;
-  return `<li class="step"><input type="checkbox" id="${esc(id)}" data-item="${esc(item.id)}"
+  return `<li class="step" data-fit><input type="checkbox" id="${esc(id)}" data-item="${esc(item.id)}"
     ${done.has(item.id) ? "checked" : ""}><label for="${esc(id)}">${segmentsHtml(item.segments)}</label></li>`;
 }
 
@@ -265,17 +269,72 @@ function factHtml(f) {
     aria-hidden="true">${icon}</svg>` : ""}<b>${esc(f.number)}</b><span>${esc(f.text)}</span></li>`;
 }
 
+// Today: the plan, and the basic emergency kit beside it. What already happened near the
+// home is the "Before" view's.
 function summaryHtml() {
-  const h = data.history || {};
-  const facts = h.highlights || [];
-  const left = `
-    <div class="col">
-      <h2>What has happened around this home</h2>
-      ${facts.length ? `<ul class="facts">${facts.map(factHtml).join("")}</ul>`
-        : `<p class="muted">${esc(h.note || "No floods, wildfires or avalanches are on record near this address.")}</p>`}
-    </div>`;
   const all = plans().flatMap(checkable);
-  return left + stepsColumn("Your action plan", summarySteps(), all, "See the full plan →");
+  return stepsColumn("Your action plan", summarySteps(), all, "See the full plan →") + kitHtml();
+}
+
+// ------------------------------------------------------------------ what to buy
+// Beside the plan: with no risk picked, the basic emergency kit, our own list for every
+// home, with what it costs in all and the button that buys it store by store; with a risk
+// picked, the products its plan proposes, each linked to its store's own page.
+function shopRowHtml(p, sponsored) {
+  return `
+    <li data-fit><a class="kit-row" href="${esc(p.url)}" target="_blank" rel="noopener${sponsored ? " sponsored" : ""}">
+      <span class="kit-shot"><img src="${esc(p.image)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer"></span>
+      <span class="kit-item"><b>${esc(p.name)}</b><span>${esc(p.what)}</span></span>
+      <span class="kit-price"><b>${EUROS.format(p.price)}</b><small>${esc(p.store)} ↗</small></span></a></li>`;
+}
+
+function kitHtml() {
+  const kit = advancedKit();
+  if (!kit || !(kit.items || []).length) return "";
+  return `
+    <div class="col kit-col">
+      <div class="col-head"><h2>Basic emergency kit</h2>
+        <a class="col-link" href="${esc(pageHref("kit"))}" data-nav>See all ${kit.items.length} →</a></div>
+      <ul class="kit-preview">${kit.items.slice(0, SHOP_ROWS).map((i) => shopRowHtml(i, true)).join("")}</ul>
+      <div class="kit-buy">
+        <div class="adv-total"><b>${EUROS_ROUND.format(kit.total)}</b><span>the whole kit</span></div>
+        <button type="button" class="adv-cta" data-adv-buy>Buy the kit</button>
+      </div>
+    </div>`;
+}
+
+// The products a risk's plan proposes: the first for each thing to buy, then the others.
+function riskProducts(plan) {
+  const lists = buySteps(plan).map((i) => i.products);
+  const out = [];
+  for (let round = 0; lists.some((l) => l[round]); round++) {
+    lists.forEach((l) => { if (l[round] && !out.some((p) => p.id === l[round].id)) out.push(l[round]); });
+  }
+  return out;
+}
+
+function riskShopHtml(risk) {
+  const plan = plans().find((p) => p.key === risk.key);
+  const list = plan ? riskProducts(plan) : [];
+  if (!list.length) return kitHtml();
+  const seen = ((data && data.action_plan) || {}).prices_seen;
+  return `
+    <div class="col kit-col">
+      <div class="col-head"><h2>What to buy</h2>
+        ${list.length > 1 ? `<button type="button" class="col-link" data-plan-open="${esc(risk.key)}">See all ${list.length} →</button>` : ""}</div>
+      <ul class="kit-preview">${list.slice(0, SHOP_ROWS).map((p) => shopRowHtml(p, !!p.partner)).join("")}</ul>
+      <p class="kit-note">Chosen for ${esc(NAMES[risk.key].toLowerCase())}. Each links to its store's own page${seen
+        ? `; prices as seen on ${niceDate(seen)}, they change` : ""}.</p>
+    </div>`;
+}
+
+// On a screen the report fills, the card never scrolls: the rows a column cannot hold go,
+// from the last, so the plan shows as many steps as fit and the shop as many products.
+function fitRows(el) {
+  el.querySelectorAll(":scope > .col").forEach((col) => {
+    const rows = [...col.querySelectorAll("[data-fit]")];
+    for (let i = rows.length - 1; i > 0 && col.scrollHeight > col.clientHeight + 1; i--) rows[i].remove();
+  });
 }
 
 function storyHtml(risk) {
@@ -294,10 +353,8 @@ function riskStepsHtml(risk) {
   const plan = plans().find((p) => p.key === risk.key);
   if (!plan) return "";
   const all = checkable(plan);
-  const first = all.slice(0, FIRST_STEPS);
-  const rest = all.length - first.length;
-  return stepsColumn("What to do first", first, all,
-    rest > 0 ? `See the other ${rest} step${rest > 1 ? "s" : ""} →` : "See the full plan →");
+  return stepsColumn("What to do first", all.slice(0, PLAN_STEPS), all,
+    all.length > PLAN_STEPS ? `See all ${all.length} steps →` : "See the full plan →");
 }
 
 function calmHtml() {
@@ -310,7 +367,13 @@ function calmHtml() {
 }
 
 function renderDetail() {
-  if (horizon === "2050" && data && data.ahead) { renderFutureDetail(); return; }
+  if (horizon === "2050" && data && data.ahead) renderFutureDetail();
+  else if (horizon === "before" && data && data.past) renderPastDetail();
+  else renderTodayDetail();
+  fitRows($("#detail"));
+}
+
+function renderTodayDetail() {
   const el = $("#detail");
   const risk = active && data && (data.risks || []).find((r) => r.key === active);
   el.dataset.view = !risk ? "summary" : risk.worth ? "risk" : "calm";
@@ -318,9 +381,10 @@ function renderDetail() {
   if (!risk) setHtml(el, summaryHtml());
   // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
   else if (!risk.worth) setHtml(el, calmHtml());
+  // Today a risk shows its first steps and what to buy for it; its story is the "Before"
+  // view's.
   // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
-  else setHtml(el, storyHtml(risk) + riskStepsHtml(risk));
-  addMoney(el, risk);
+  else setHtml(el, riskStepsHtml(risk) + riskShopHtml(risk));
 }
 
 function detailLoading() {
@@ -359,24 +423,23 @@ function futureTileHtml(key, risk) {
     </button>`;
 }
 
+// The 2050 view only shows what changes: the plan is today's.
 function futureSummaryHtml() {
   const items = data.ahead.highlights || [];
-  const left = `
-    <div class="col">
+  return `
+    <div class="col wide">
       <h2>What changes by 2050</h2>
       ${items.length ? `<ul class="facts ahead-facts">${items.map(factHtml).join("")}</ul>`
         : `<p class="muted">The climate models project little change here by 2050.</p>`}
       <p class="ahead-fine">${esc(data.ahead.scenario)}</p>
     </div>`;
-  const all = plans().flatMap(checkable);
-  return left + stepsColumn("Your action plan", summarySteps(), all, "See the full plan →");
 }
 
 function futureStoryHtml(key) {
   const f = ahead(key);
   const rows = f.rows || [];
   return `
-    <div class="col">
+    <div class="col wide">
       <h2>${esc(f.title)}</h2>
       ${rows.length ? `<ul class="ahead-rows" data-family="${esc(key)}">${rows.map((r) => `
         <li><span class="ahead-label">${esc(r.label)}</span>
@@ -396,7 +459,6 @@ function renderFutureDetail() {
     el.dataset.view = "summary";
     // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
     setHtml(el, futureSummaryHtml());
-    addMoney(el, null);
     return;
   }
   const f = ahead(risk.key);
@@ -408,18 +470,78 @@ function renderFutureDetail() {
   }
   el.dataset.view = "risk";
   // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
-  setHtml(el, futureStoryHtml(risk.key) + (riskStepsHtml(risk) || `
+  setHtml(el, futureStoryHtml(risk.key));
+}
+
+// ------------------------------------------------------------------ before
+// What already happened near the home, from the report's history: each risk's number on
+// its tile; in the card, what stands out and the record, newest first, or a risk's story
+// beside its own record.
+function past(key) { return ((data && data.past && data.past.risks) || {})[key] || {}; }
+
+function pastTileHtml(key, risk) {
+  const p = past(key);
+  const value = p.value == null ? "—" : `${esc(p.value)}${p.unit ? `<small>${esc(p.unit)}</small>` : ""}`;
+  return `
+    <button type="button" class="tile past${p.available ? "" : " dim"}" data-family="${key}"
+      style="--grow:${grow(risk)}" aria-pressed="${active === key}">
+      <span class="tile-name"><span class="tile-dot" aria-hidden="true"></span>${NAMES[key]}</span>
+      ${p.fact ? `<span class="tile-fact">${esc(p.fact)}</span>` : ""}
+      <span class="tile-foot"><span class="tile-value">${value}</span>${tileIcon(key)}</span>
+    </button>`;
+}
+
+function recordHtml(rows, notes = []) {
+  const sources = [...new Set(rows.map((r) => r.source).filter(Boolean))];
+  const title = (r) => (r.url
+    ? `<a class="plain-link" href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title)}</a>` : esc(r.title));
+  return `
     <div class="col">
-      <h2>What to do first</h2>
-      <p class="muted">Today this risk scores low here, so your plan has no steps for it yet.</p>
-      <a class="more" href="${esc(pageHref("shop"))}" data-nav>See the full plan →</a>
-    </div>`));
-  addMoney(el, risk);
+      <div class="col-head"><h2>On record</h2><span class="done-count">Newest first</span></div>
+      ${rows.length ? `<ul class="story record">${rows.map((r) => `
+        <li><span class="when">${esc(whenLabel(r.date))}</span>
+          <span class="what"><span class="dot" data-family="${esc(r.family)}" aria-hidden="true"></span>
+            <span>${title(r)}${r.detail ? `<small>${esc(r.detail)}</small>` : ""}</span></span></li>`).join("")}</ul>`
+        : `<p class="muted">Nothing on record near this address.</p>`}
+      ${notes.map((n) => `<p class="ahead-fine">${esc(n)}</p>`).join("")}
+      ${sources.length ? `<p class="ahead-fine">Sources: ${sources.map(esc).join(" · ")}.</p>` : ""}
+    </div>`;
+}
+
+function pastSummaryHtml() {
+  const h = data.history || {};
+  const facts = h.highlights || [];
+  return `
+    <div class="col">
+      <h2>What has happened around this home</h2>
+      ${facts.length ? `<ul class="facts">${facts.map(factHtml).join("")}</ul>`
+        : `<p class="muted">${esc(h.note || "No floods, wildfires or avalanches are on record near this address.")}</p>`}
+      ${facts.length && h.note ? `<p class="ahead-fine">${esc(h.note)}</p>` : ""}
+    </div>${recordHtml(h.items || [])}`;
+}
+
+function renderPastDetail() {
+  const el = $("#detail");
+  const risk = active && (data.risks || []).find((r) => r.key === active);
+  if (!risk) {
+    el.dataset.view = "summary";
+    setHtml(el, pastSummaryHtml());
+    return;
+  }
+  const p = past(risk.key);
+  if (!(risk.story || []).length && !(p.record || []).length) {
+    el.dataset.view = "calm";
+    setHtml(el, `<div class="calm"><h2>Nothing on record here</h2><p>${esc(p.fact || "")}</p></div>`);
+    return;
+  }
+  el.dataset.view = "risk";
+  setHtml(el, storyHtml(risk) + recordHtml(p.record || [], p.notes || []));
 }
 
 // ------------------------------------------------------------------ public money
 // Grants, tax deductions and public cover that can pay for part of the plan, from the
 // report's checked catalogue: who can apply, how much, until when, and the official page.
+// The "Public programmes" button beside the horizons opens them, on the risk picked if any.
 let grantsFamily = "all";
 let grantsFocus = null;
 
@@ -429,27 +551,6 @@ function grantsFor(key) {
   const items = grants().items || [];
   if (!key || key === "all") return items;
   return items.filter((g) => (g.families || []).includes(key));
-}
-
-// The strip at the bottom of the card: how many programmes can pay for this.
-function moneyHtml(key) {
-  const g = grants();
-  const text = key ? ((g.families || {})[key] || {}).text : g.summary;
-  if (!text) return "";
-  return `
-    <button type="button" class="money" data-grants-open="${esc(key || "all")}">
-      <span class="money-icon" aria-hidden="true">€</span>
-      <span class="money-text">${esc(text)}</span>
-      <span class="money-go" aria-hidden="true">→</span>
-    </button>`;
-}
-
-// Under the steps, in the plan's column: it pays for them, and it takes no height from the
-// story beside it.
-function addMoney(el, risk) {
-  if (el.dataset.view === "calm") return;
-  const cols = el.querySelectorAll(":scope > .col");
-  (cols[cols.length - 1] || el).insertAdjacentHTML("beforeend", moneyHtml(risk ? risk.key : null));
 }
 
 function grantHtml(item) {
@@ -525,8 +626,19 @@ function closeGrants() {
   if (grantsFocus && document.contains(grantsFocus)) grantsFocus.focus();
 }
 
+// Before, Today and 2050 when the report has them, and the public money when a programme
+// applies here.
+function renderControls() {
+  $("#heroControls").hidden = !data;
+  if (!data) return;
+  $('.horizon-btn[data-horizon="before"]').hidden = !data.past;
+  $('.horizon-btn[data-horizon="2050"]').hidden = !data.ahead;
+  $("#grantsBtn").hidden = !(grants().items || []).length;
+  $("#grantsBtn").title = grants().summary || "";
+}
+
 function setHorizon(next) {
-  horizon = next === "2050" ? "2050" : "today";
+  horizon = ["before", "2050"].includes(next) ? next : "today";
   $("#report").dataset.horizon = horizon;
   $$(".horizon-btn").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.horizon === horizon)));
   if (!data) return;
@@ -753,9 +865,9 @@ function toggleHave(id) {
   if (again) again.focus();
 }
 
-// ------------------------------------------------------------------ the Advanced Kit
-// Step two, the same for every home: what keeps working with no power, no network and no
-// shop open. Its items come from the report's catalogue; buying it opens them store by store.
+// ------------------------------------------------------------------ the basic emergency kit
+// The same for every home: what keeps working with no power, no network and no shop open.
+// Its items come from the report's catalogue; buying it opens them store by store.
 let advFocus = null;
 
 function advancedKit() { return (data && data.advanced_kit) || null; }
@@ -785,7 +897,7 @@ function renderKit() {
   setHtml($("#advGrid"), kit.items.map(advItemHtml).join("") + `
     <div class="adv-summary">
       <div class="adv-summary-head">
-        <span class="adv-summary-title">The whole Advanced Kit</span>
+        <span class="adv-summary-title">The whole kit</span>
         <span class="adv-summary-text">${esc(many)} items across ${esc((WORDS[kit.stores] || String(kit.stores)).toLowerCase())}
           stores, in one list you can shop at your own pace.</span>
       </div>
@@ -845,13 +957,15 @@ function showPage(next) {
     back.setAttribute("href", pageHref("risks"));
     renderShop();
   } else if (page === "kit") {
-    back.textContent = "← Back to the basics";
-    back.setAttribute("href", pageHref("shop"));
+    back.textContent = "← Back to your risks";
+    back.setAttribute("href", pageHref("risks"));
     renderKit();
   } else {
     back.textContent = "← Edit address";
     back.setAttribute("href",
       `/?${new URLSearchParams({ address: params.address, home: params.home || "house", floor: params.floor || "" })}`);
+    // The card fits its rows only while it shows.
+    if (data) renderDetail();
   }
 }
 
@@ -958,7 +1072,7 @@ async function loadReport({ keep = false } = {}) {
     renderFooter();
     renderShop();
     renderKit();
-    $("#horizon").hidden = !data.ahead;
+    renderControls();
     $("#pdfBtn").disabled = pdfBusy;
     const illustrated = (data.risks || []).filter((r) => r.illustration).sort((a, b) => b.score - a.score);
     media.setPreviews(illustrated);
@@ -973,7 +1087,7 @@ async function loadReport({ keep = false } = {}) {
     heroError(err.status === 404 ? err.message
       : "Our data sources are busy right now. Please try again in a few minutes.");
     $("#tiles").innerHTML = "";
-    $("#horizon").hidden = true;
+    $("#heroControls").hidden = true;
     $("#detail").dataset.view = "empty";
     $("#detail").innerHTML = "";
     $("#shopTitle").textContent = "We could not analyse this address.";
@@ -1011,10 +1125,7 @@ export function initReport(appRef) {
     const btn = e.target.closest(".horizon-btn");
     if (btn) setHorizon(btn.dataset.horizon);
   });
-  $("#detail").addEventListener("click", (e) => {
-    const money = e.target.closest("[data-grants-open]");
-    if (money) openGrants(money.dataset.grantsOpen);
-  });
+  $("#grantsBtn").addEventListener("click", () => openGrants(active || "all"));
   $("#grantsDialog").addEventListener("click", (e) => {
     if (e.target.closest("[data-close]")) { closeGrants(); return; }
     const tab = e.target.closest("[data-grants-family]");
@@ -1025,12 +1136,24 @@ export function initReport(appRef) {
   });
 
   $("#detail").addEventListener("click", (e) => {
+    if (e.target.closest("[data-adv-buy]")) { openAdv(); return; }
     const more = e.target.closest("[data-plan-open]");
     if (more) { openPlan(more.dataset.planOpen); return; }
     const ill = e.target.closest("[data-illustration]");
     if (ill && data) media.showIllustration(data.risks.find((r) => r.key === ill.dataset.illustration));
   });
   $("#detail").addEventListener("change", onChecked);
+  // A store photo that does not load leaves an empty frame, not a broken image.
+  $("#detail").addEventListener("error", (e) => {
+    const frame = e.target.closest && e.target.closest(".kit-shot");
+    if (frame) frame.classList.add("broken");
+  }, true);
+  // On a desktop the card holds as many rows as the window allows, so it fits them again
+  // when the window changes (a phone only changes height, as its address bar comes and goes).
+  const desktop = window.matchMedia("(pointer: fine)");
+  window.addEventListener("resize", debounce(() => {
+    if (data && page === "risks" && desktop.matches) renderDetail();
+  }, 150));
   $("#plan").addEventListener("change", onChecked);
   // A store photo that does not load leaves an empty frame, not a broken image.
   $("#plan").addEventListener("error", (e) => {
@@ -1138,7 +1261,7 @@ export function showReport(search, target = "risks") {
   active = null;
   activePlan = "emergency";
   setHorizon("today");
-  $("#horizon").hidden = true;
+  $("#heroControls").hidden = true;
   closeGrants();
   $("#report").dataset.active = "";
   $("#editLink").setAttribute("href",

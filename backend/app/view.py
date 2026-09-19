@@ -11,7 +11,7 @@ from __future__ import annotations
 import datetime as dt
 import re
 
-from . import ahead, grants, products, protection
+from . import ahead, grants, past, products, protection, simulations
 from .hazards_official import ZONE_ORDER, ZONE_SHORT
 
 # The four risk tiles, in the order the app lays them out.
@@ -257,10 +257,18 @@ def _highlights(report: dict) -> list[dict]:
                     "text": f"wildfire{'s' if n[0] != 1 else ''} within 5 km since {n[1]}."})
     sat = _satellite_fires(report)
     if sat:
+        # The report keeps only the latest fires: the year's count is known when an older
+        # fire is listed too, or when the list holds them all; otherwise the whole record.
+        total = _count(report, "wildfire", "satellite_fires_10km")
         this_year = [f for f in sat if f["first"][:4] == str(dt.date.today().year)]
-        pool, when = (this_year, "this year") if this_year else (sat, f"since {sat[-1]['first'][:4]}")
-        out.append({"number": str(len(pool)), "family": "wildfire", "icon": "satellite",
-                    "text": f"fire{'s' if len(pool) != 1 else ''} seen by satellite within 10 km {when}."})
+        if this_year and (len(this_year) < len(sat) or not total or total[0] <= len(sat)):
+            n, when = len(this_year), "this year"
+        elif total:
+            n, when = total[0], f"since {total[1]}"
+        else:
+            n, when = len(sat), f"since {sat[-1]['first'][:4]}"
+        out.append({"number": str(n), "family": "wildfire", "icon": "satellite",
+                    "text": f"fire{'s' if n != 1 else ''} seen by satellite within 10 km {when}."})
     n = _count(report, "avalanche", "avalanche_observed")
     if n:
         out.append({"number": str(n[0]), "family": "avalanche", "icon": "mountain",
@@ -341,9 +349,13 @@ def _tile(report: dict, key: str, label: str, family: dict | None) -> dict:
 
 
 def risks(report: dict) -> list[dict]:
-    """The four risk tiles, in the app's order."""
+    """The four risk tiles, in the app's order. Where the place has simulations drawn on
+    its own street photo (simulations.py), they replace the generic illustrations."""
     families = {f["key"]: f for f in (report.get("protection") or {}).get("families", [])}
-    return [_tile(report, key, label, families.get(key)) for key, label in TILES]
+    tiles = [_tile(report, key, label, families.get(key)) for key, label in TILES]
+    for tile in tiles:
+        tile["illustration"] = simulations.for_tile(report, tile) or tile["illustration"]
+    return tiles
 
 
 def app_view(report: dict) -> dict:
@@ -364,6 +376,7 @@ def app_view(report: dict) -> dict:
         "overall": report.get("overall"),
         "headline": headline(tiles),
         "risks": tiles,
+        "past": past.build(report, tiles),
         "ahead": future,
         "grants": grants.for_report(report, tiles, future),
         "advanced_kit": products.advanced_kit(),

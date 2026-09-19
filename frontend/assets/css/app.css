@@ -113,39 +113,51 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
   background-size: 3px 3px;
 }
-/* The same home, safe and burning, either side of the form: as wide as the room beside
-   the 560 px card allows, centred on the card (the logo above it puts the card's middle
-   63 px below the page's), and gone when there is no room. */
+/* The same home through four risks, all in one row: two clips either side of the form,
+   against the window's edges, with the same space between the two clips as between the
+   inner one and the 560 px card. Each side runs from its edge to the card; its clips are
+   as wide as that room allows with 16 px spaces (at most 274 px) and share out what is
+   left evenly, the empty ::after or ::before standing for the card's side. Centred on the
+   card (the logo above it puts the card's middle 63 px below the page's), and gone when
+   there is no room. */
 .home-side {
   position: absolute;
   top: calc(50% + 63px);
   transform: translateY(-50%);
-  width: min(440px, calc((100vw - 560px) / 2));
-  aspect-ratio: 440 / 400;
-  object-fit: cover;
-  border-radius: 22px;
-  box-shadow: 0 30px 70px rgba(6, 8, 4, 0.45);
+  display: flex;
+  justify-content: space-between;
   pointer-events: none;
 }
-.home-side.left { left: -24px; }
-.home-side.right { right: -26px; }
-/* On the right, four clips in turn (reel.js), stacked in the same frame: the one playing
-   on top, fading in over the last frame of the one before. Nothing shows it is a video. */
-.home-reel { overflow: hidden; }
-.home-reel video {
-  position: absolute; inset: 0; width: 100%; height: 100%;
+.home-side.left { left: -24px; width: calc(50% - 256px); }
+.home-side.right { right: -26px; width: calc(50% - 254px); }
+.home-side.left::after, .home-side.right::before { content: ""; }
+/* Each clip sits over its own last frame (clips.js), a little taller than the 3:4 clips
+   so they grow where the width is spent. The still shows until the clip plays and while
+   it waits for the others, and it is all there is with reduced motion. */
+.home-clip {
+  flex: none;
+  width: min(274px, calc(50% - 16px));
+  aspect-ratio: 2 / 3;
+  border-radius: 22px;
+  overflow: hidden;
+  background: #0a0908 center / cover no-repeat;
+  box-shadow: 0 30px 70px rgba(6, 8, 4, 0.45);
+}
+.home-clip[data-clip="wildfire"] { background-image: url('/assets/media/home-wildfire.jpg'); }
+.home-clip[data-clip="flood"] { background-image: url('/assets/media/home-flood.jpg'); }
+.home-clip[data-clip="heat"] { background-image: url('/assets/media/home-heat.jpg'); }
+.home-clip[data-clip="avalanche"] { background-image: url('/assets/media/home-avalanche.jpg'); }
+.home-clip video {
+  display: block; width: 100%; height: 100%;
   object-fit: cover; border-radius: inherit;
-  opacity: 0; transition: opacity 0.7s ease;
+  opacity: 0;
 }
-.home-reel video.on { opacity: 1; }
-/* Where autoplay is refused (iOS in Low Power Mode) the poster stays, with no play button. */
-.home-reel video::-webkit-media-controls,
-.home-reel video::-webkit-media-controls-start-playback-button { display: none !important; -webkit-appearance: none; }
-@media (prefers-reduced-motion: reduce) {
-  /* The clips never load: the burning home stays as a still. */
-  .home-reel { background: url('/assets/media/home-fire.jpg') center / cover; }
-  .home-reel video { display: none; }
-}
+/* It fades in over the still each time it starts; before the four start again they go at
+   once, onto their stills, which are the frames they stopped on. */
+.home-clip video.on { opacity: 1; transition: opacity 0.6s ease; }
+/* Where autoplay is refused (iOS in Low Power Mode) the still stays, with no play button. */
+.home-clip video::-webkit-media-controls,
+.home-clip video::-webkit-media-controls-start-playback-button { display: none !important; -webkit-appearance: none; }
 
 .home-stack {
   position: relative;
@@ -323,7 +335,9 @@ button:focus-visible, a:focus-visible, input:focus-visible {
     linear-gradient(160deg, #1c2618 0%, #2b3722 40%, #4a5436 75%, #6d7048 100%);
   background-attachment: fixed;
 }
-@media (min-width: 1101px) and (min-height: 760px) {
+/* One screen when it is tall enough for the card under the risks to hold the plan and the
+   kit; on a shorter one the page scrolls and the card keeps its height. */
+@media (min-width: 1101px) and (min-height: 860px) {
   .view-report { height: 100vh; height: 100dvh; }
 }
 .view-report > * { position: relative; z-index: 1; }
@@ -472,7 +486,9 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .chip-btn.solid:hover { background: var(--cta-hover); }
 
 /* Hero: the sentence, the home's picture and the briefing --------------------------- */
-.rep-hero { display: flex; align-items: center; justify-content: space-between; gap: 48px; }
+/* The text column is as tall as the picture: the title stays at its top and the controls
+   at its bottom, so a shorter title (2050, before) does not move either of them. */
+.rep-hero { display: flex; align-items: stretch; justify-content: space-between; gap: 48px; }
 .hero-text { flex: 1 1 380px; display: flex; flex-direction: column; gap: 10px; max-width: 840px; min-width: 0; }
 .hero-text h1 {
   margin: 0;
@@ -949,7 +965,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 }
 .adv-link:hover { color: var(--cream); }
 
-/* ================================================================ The Advanced Kit */
+/* ================================================================ The basic emergency kit */
 .adv-hero { display: flex; align-items: flex-end; justify-content: space-between; gap: 40px; }
 .adv-intro { display: flex; flex-direction: column; gap: 8px; max-width: 780px; min-width: 0; }
 .adv-eyebrow { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
@@ -1108,15 +1124,16 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   .pv-bg, .tile, .thumb, .prod, .adv-item { transition: none; }
 }
 
-/* ================================================================ Today or 2050 */
+/* ================================================================ Before, today or 2050 */
+/* The horizons, and beside them the public money that can pay for the plan. */
+.hero-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-top: auto; padding-top: 4px; }
 .horizon {
-  align-self: flex-start;
-  display: inline-flex; gap: 4px; margin-top: 4px; padding: 4px;
+  display: inline-flex; gap: 4px; padding: 4px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.07); border: 1px solid rgba(255, 255, 255, 0.18);
 }
 .horizon-btn {
-  padding: 7px 18px; border-radius: 999px; border: none; cursor: pointer;
+  padding: 7px 14px; border-radius: 999px; border: none; cursor: pointer;
   background: transparent; color: var(--cream-62);
   font-size: 14px; font-weight: 700; letter-spacing: 0.01em;
   transition: background .15s, color .15s;
@@ -1124,12 +1141,14 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .horizon-btn:hover { color: var(--cream); }
 .horizon-btn[aria-pressed="true"] { background: var(--cta); color: var(--cta-text); }
 .horizon-btn[data-horizon="2050"][aria-pressed="true"] { background: var(--lime); }
+.horizon-btn[data-horizon="before"][aria-pressed="true"] { background: #E2D2B0; }
 
 /* A 2050 tile: the change, then where it goes from and to. */
 .tile-value small { margin-left: 5px; font-size: 17px; font-weight: 600; color: var(--cream-80); }
 .tile-value small.word { margin-left: 0; font-size: 24px; color: inherit; }
 
-/* The 2050 numbers in the card under the risks. */
+/* The 2050 numbers in the card under the risks: one column, across the whole card. */
+.col.wide { grid-column: 1 / -1; }
 .ahead-facts li[data-family="wildfire"] b, .ahead-rows[data-family="wildfire"] .ahead-change { color: var(--wildfire); }
 .ahead-facts li[data-family="flood"] b, .ahead-rows[data-family="flood"] .ahead-change { color: var(--flood); }
 .ahead-facts li[data-family="heat"] b, .ahead-rows[data-family="heat"] .ahead-change { color: var(--heat); }
@@ -1150,23 +1169,20 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 }
 
 /* ================================================================ Public money */
-/* The line under the plan's steps: how many programmes can pay for them. */
-.money {
-  align-self: stretch; flex-shrink: 0;
-  display: flex; align-items: center; gap: 10px;
-  padding: 8px 12px; border-radius: 12px; cursor: pointer; text-align: left;
+/* The button beside the horizons: the programmes that can pay for the plan. */
+.programmes-btn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 6px 14px 6px 6px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+  font-size: 14px; font-weight: 700; letter-spacing: 0.01em; color: var(--cream);
   background: rgba(186, 242, 74, 0.08); border: 1px solid rgba(186, 242, 74, 0.35);
-  color: var(--cream); font-family: var(--font-body);
   transition: background .15s, border-color .15s;
 }
-.money:hover { background: rgba(186, 242, 74, 0.14); border-color: rgba(186, 242, 74, 0.6); }
+.programmes-btn:hover { background: rgba(186, 242, 74, 0.14); border-color: rgba(186, 242, 74, 0.6); }
 .money-icon {
-  width: 24px; height: 24px; border-radius: 999px; flex-shrink: 0;
+  width: 27px; height: 27px; border-radius: 999px; flex-shrink: 0;
   display: grid; place-items: center;
   background: var(--lime); color: var(--cta-text); font-weight: 800; font-size: 13px;
 }
-.money-text { flex: 1; min-width: 0; font-size: 14.5px; font-weight: 600; line-height: 1.35; }
-.money-go { flex-shrink: 0; font-size: 15px; font-weight: 700; color: var(--link); }
 
 /* The panel with the programmes. */
 .grants-panel { width: min(1100px, 100%); }
@@ -1205,11 +1221,63 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .grant-gaps .dot { width: 7px; height: 7px; border-radius: 999px; flex-shrink: 0; transform: translateY(-1px); }
 @media (max-width: 760px) {
   .grant-list { grid-template-columns: minmax(0, 1fr); }
-  .money { flex-wrap: wrap; gap: 10px; }
-  .money-text { font-size: 15px; }
 }
 @media (max-width: 640px) {
-  .horizon-btn { padding: 7px 16px; }
+  .horizon-btn { padding: 7px 12px; }
   .tile-value small { font-size: 15px; }
   .tile-value small.word { font-size: 20px; }
 }
+
+/* ================================================================ What to buy, beside the plan */
+/* The basic emergency kit, or the products for the risk picked: a row per product, linked
+   to its store. */
+.col-link {
+  flex-shrink: 0; padding: 0; background: none; border: none; cursor: pointer; white-space: nowrap;
+  font-family: var(--font-body); font-size: 15px; font-weight: 600; color: var(--link); text-decoration: none;
+}
+.col-link:hover { text-decoration: underline; }
+.kit-preview { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.kit-row {
+  display: grid; grid-template-columns: 48px minmax(0, 1fr) auto; align-items: center; gap: 14px;
+  padding: 6px 14px 6px 6px; border-radius: 14px;
+  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--cream); text-decoration: none;
+  transition: background .15s, border-color .15s;
+}
+.kit-row:hover { background: rgba(255, 255, 255, 0.11); border-color: rgba(186, 242, 74, 0.55); }
+.kit-shot {
+  width: 48px; height: 48px; padding: 4px; border-radius: 10px; background: #fff;
+  display: grid; place-items: center; overflow: hidden;
+}
+.kit-shot img { max-width: 100%; max-height: 100%; object-fit: contain; display: block; }
+.kit-shot.broken { background: rgba(255, 255, 255, 0.10); }
+.kit-shot.broken img { display: none; }
+.kit-item { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.kit-item b { font-size: 15.5px; font-weight: 600; line-height: 1.3; color: var(--cream); }
+.kit-item span {
+  font-size: 13.5px; line-height: 1.35; color: var(--cream-62);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.kit-price { display: flex; flex-direction: column; align-items: flex-end; gap: 1px; white-space: nowrap; }
+.kit-price b {
+  font-family: var(--font-display); font-weight: 600; font-size: 19px; color: var(--cream);
+  font-variant-numeric: tabular-nums;
+}
+.kit-price small { font-size: 12.5px; color: var(--cream-55); }
+.kit-row:hover .kit-price small { color: var(--cream-80); }
+.kit-note { flex-shrink: 0; margin: auto 0 0; font-size: 12.5px; line-height: 1.5; color: var(--cream-50); }
+.kit-buy {
+  flex-shrink: 0; margin-top: auto; padding-top: 14px; border-top: 1px solid rgba(255, 255, 255, 0.12);
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+}
+.kit-buy .adv-total b { font-size: 26px; }
+.kit-buy .adv-cta { width: auto; padding: 11px 24px; }
+
+/* ================================================================ Before */
+/* The record: one row per event, newest first, with its risk's dot. */
+.record { gap: 10px; }
+.record li { align-items: baseline; }
+.record .when { line-height: 1.4; }
+.record .what { display: flex; align-items: baseline; gap: 10px; font-size: 16px; line-height: 1.4; }
+.record .dot { width: 7px; height: 7px; border-radius: 999px; flex-shrink: 0; transform: translateY(-2px); }
+.record small { display: block; margin-top: 2px; font-size: 13.5px; line-height: 1.4; color: var(--cream-60); }

@@ -1,0 +1,112 @@
+{
+ "version": 1,
+ "places": {
+  "vielha-avinguda-garona": {
+   "label": "Avinguda Garona, Vielha",
+   "photo": "vielha-avinguda-garona/raw/photo.png",
+   "credit": "Photo © Google Street View, edited by AI",
+   "scenes": {
+    "wildfire": {
+     "key": "wildfire",
+     "level": "low",
+     "score": 35,
+     "what": "a forest fire on the slopes 1.0 km away, as far as the nearest fire on record",
+     "chosen_by": {
+      "label": "Distance to the nearest perimeter",
+      "shown": "1.0 km",
+      "rule": "Fire level low (35/100)",
+      "source": "Government of Catalonia · Department of Agriculture · wildfire perimeters"
+     },
+     "still": "vielha-avinguda-garona/stills/wildfire.jpg",
+     "image_model": "fal-ai/nano-banana-2/edit",
+     "image_prompt": "Edit this street photograph to show a small forest fire on the wooded slopes in the background, about 1.0 km away: a thin column of grey smoke rises from the trees and drifts with the wind; the town, the road and everything in the foreground are untouched, and the sky is still blue with a light haze. Keep the camera position, the framing, the road, the buildings, the trees, the railings and the mountains exactly as they are, and change only what the scene needs. Do not add any text, signs or people. Photorealistic, natural colours.",
+     "seed": 7,
+     "still_generated_at": "2026-09-19T19:39:34+00:00",
+     "video": "vielha-avinguda-garona/wildfire.mp4",
+     "poster": "vielha-avinguda-garona/wildfire.jpg",
+     "video_model": "fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
+     "motion_prompt": "The smoke rises slowly and drifts with the wind; the leaves of the trees stir in the breeze. The camera is completely static. The road, the buildings and the mountains do not move or change shape.",
+     "negative_prompt": "text, captions, subtitles, watermark, logo, morphing buildings, warping, distorted cars, blur, low quality, close-up faces, flames in the street, burning buildings, fire in the foreground",
+     "video_seconds": 5,
+     "video_bytes": 192309,
+     "generated_at": "2026-09-19T19:40:52+00:00"
+    },
+    "flood": {
+     "key": "flood",
+     "level": "very high",
+     "score": 92,
+     "what": "0.93 m of water in the street, the river water depth for the 100-year flood in the official maps",
+     "chosen_by": {
+      "label": "River water depth, 100-year flood",
+      "shown": "0.93 m",
+      "rule": "Flooding level very high (92/100)",
+      "source": "SNCZI · river and coastal flood depths, via the IGN INSPIRE WMS"
+     },
+     "still": "vielha-avinguda-garona/stills/flood.jpg",
+     "image_model": "fal-ai/nano-banana-2/edit",
+     "image_prompt": "Edit this street photograph into a flood. The river has burst its banks: muddy brown floodwater whose surface is about 0.9 m above the road fills the whole street. The waterline is high: on the parked cars it reaches the bottom of the side windows, so their wheels, doors, headlights and grilles are all under water and only the windows and roofs show; on the metal railings only the top rail shows above the water; the tree trunks are under water up to about 1 m. The current flows along the street carrying branches and debris. Overcast sky, light rain. Keep the camera position, the framing, the road, the buildings, the trees, the railings and the mountains exactly as they are, and change only what the scene needs. Do not add any text, signs or people. Photorealistic, natural colours.",
+     "seed": 20260920,
+     "still_generated_at": "2026-09-19T19:38:56+00:00",
+     "video": "vielha-avinguda-garona/flood.mp4",
+     "poster": "vielha-avinguda-garona/flood.jpg",
+     "video_model": "fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
+     "motion_prompt": "The muddy floodwater flows fast along the street with ripples, eddies and floating branches; light rain falls on the water. The camera is completely static. The road, the buildings and the mountains do not move or change shape.",
+     "negative_prompt": "text, captions, subtitles, watermark, logo, morphing buildings, warping, distorted cars, blur, low quality, close-up faces",
+     "video_seconds": 5,
+     "video_bytes": 694838,
+     "generated_at": "2026-09-19T19:40:55+00:00"
+    },
+    "avalanche": {
+     "key": "avalanche",
+     "level": "low",
+     "score": 22,
+     "what": "winter, with an avalanche on the nearest mapped avalanche slope, 790 m away",
+     "chosen_by": {
+      "label": "Distance to the nearest mapped avalanche zone",
+      "shown": "790 m",
+      "rule": "Avalanches level low (22/100)",
+      "source": "ICGC · Mapa de zones d'allaus de Catalunya 1:25,000 (Catalan avalanche database, BDAC), via WFS"
+     },
+     "still": "vielha-avinguda-garona/stills/avalanche.jpg",
+     "image_model": "fal-ai/nano-banana-2/edit",
+     "image_prompt": "Edit this street photograph into a winter day after a heavy snowfall: deep snow covers the mountains, the forest, the roofs and the ground; the road has been cleared, with banks of snow along its edges; overcast, cold light. Far away on a steep mountainside in the background, about 790 m away, a small powder avalanche slides down an open gully in the forest and stops high on the slope, far above the houses. Keep the camera position, the framing, the road, the buildings, the trees, the railings and the mountains exactly as they are, and change only what the scene needs. Do not add any text, signs or people. Photorealistic, natural colours.",
+     "seed": 20260921,
+     "still_generated_at": "2026-09-19T19:36:33+00:00",
+     "video": "vielha-avinguda-garona/avalanche.mp4",
+     "poster": "vielha-avinguda-garona/avalanche.jpg",
+     "video_model": "fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
+     "motion_prompt": "Far away on the mountainside the avalanche slides down and its powder cloud grows, drifts and settles; a few snowflakes drift in the air. The camera is completely static. The road, the buildings and the mountains do not move or change shape.",
+     "negative_prompt": "text, captions, subtitles, watermark, logo, morphing buildings, warping, distorted cars, blur, low quality, close-up faces, snow cloud over the street, avalanche reaching the road",
+     "video_seconds": 5,
+     "video_bytes": 516660,
+     "generated_at": "2026-09-19T19:40:48+00:00"
+    },
+    "heat": {
+     "key": "heat",
+     "level": "very low",
+     "score": 1,
+     "what": "the hottest afternoon of a typical summer; the record here is 35.4 °C",
+     "chosen_by": {
+      "label": "Highest temperature on record",
+      "shown": "35.4 °C",
+      "rule": "Heat waves level very low (1/100)",
+      "source": "ERA5 / ERA5-Land (Copernicus C3S) via Open-Meteo Archive API"
+     },
+     "still": "vielha-avinguda-garona/stills/heat.jpg",
+     "image_model": "fal-ai/nano-banana-2/edit",
+     "image_prompt": "Edit this street photograph to show the hottest afternoon this place gets in a typical summer, still short of its record of 35.4 °C: a strong high sun, a slightly hazy pale blue sky and a faint heat shimmer at the far end of the asphalt; the trees and the grass stay green and everything else stays as it is. Keep the camera position, the framing, the road, the buildings, the trees, the railings and the mountains exactly as they are, and change only what the scene needs. Do not add any text, signs or people. Photorealistic, natural colours.",
+     "seed": 20260922,
+     "still_generated_at": "2026-09-19T19:36:48+00:00",
+     "video": "vielha-avinguda-garona/heat.mp4",
+     "poster": "vielha-avinguda-garona/heat.jpg",
+     "video_model": "fal-ai/kling-video/v2.5-turbo/pro/image-to-video",
+     "motion_prompt": "Heat haze shimmers over the asphalt and the leaves stir slightly. The camera is completely static. The road, the buildings and the mountains do not move or change shape.",
+     "negative_prompt": "text, captions, subtitles, watermark, logo, morphing buildings, warping, distorted cars, blur, low quality, close-up faces, fire, smoke",
+     "video_seconds": 5,
+     "video_bytes": 188902,
+     "generated_at": "2026-09-19T19:40:52+00:00"
+    }
+   }
+  }
+ }
+}

@@ -22,17 +22,24 @@
   <div class="bg-vignette" aria-hidden="true"></div>
   <div class="bg-dots" aria-hidden="true"></div>
 
-  <img class="home-side left" src="/assets/media/home-safe.jpg" alt="A home at dusk, safe and intact">
-  <!-- The same home through a wildfire, a flood, a heatwave and an avalanche: four short
-       clips played one after the other by reel.js, with no sound and no controls. They
-       share their first frame, which is the poster. -->
-  <div class="home-side right home-reel" id="homeReel" role="img"
-       aria-label="The same home through a wildfire, a flood, a heatwave and an avalanche">
-    <video class="on" data-src="/assets/media/Incendio.mp4" poster="/assets/media/home-reel.jpg"
-           muted playsinline preload="auto" disablepictureinpicture disableremoteplayback></video>
-    <video data-src="/assets/media/inundacion.mp4" muted playsinline preload="auto" disablepictureinpicture disableremoteplayback></video>
-    <video data-src="/assets/media/OlaCalor.mp4" muted playsinline preload="auto" disablepictureinpicture disableremoteplayback></video>
-    <video data-src="/assets/media/Allau.mp4" muted playsinline preload="auto" disablepictureinpicture disableremoteplayback></video>
+  <!-- The same home through a wildfire and a flood (left), a heatwave and an avalanche
+       (right): four short clips that play together in a loop (clips.js), with no sound and
+       no controls. Each shows its last frame as a still until it plays. -->
+  <div class="home-side left">
+    <div class="home-clip" data-clip="wildfire" role="img" aria-label="The home in a wildfire">
+      <video data-src="/assets/media/Incendio.mp4" muted playsinline preload="auto" disablepictureinpicture disableremoteplayback></video>
+    </div>
+    <div class="home-clip" data-clip="flood" role="img" aria-label="The home in a flood">
+      <video data-src="/assets/media/inundacion.mp4" muted playsinline preload="auto" disablepictureinpicture disableremoteplayback></video>
+    </div>
+  </div>
+  <div class="home-side right">
+    <div class="home-clip" data-clip="heat" role="img" aria-label="The home in a heatwave">
+      <video data-src="/assets/media/OlaCalor.mp4" muted playsinline preload="auto" disablepictureinpicture disableremoteplayback></video>
+    </div>
+    <div class="home-clip" data-clip="avalanche" role="img" aria-label="The home hit by an avalanche">
+      <video data-src="/assets/media/Allau.mp4" muted playsinline preload="auto" disablepictureinpicture disableremoteplayback></video>
+    </div>
   </div>
 
   <div class="home-stack">
@@ -127,9 +134,16 @@
     <div class="hero-text" aria-live="polite">
       <h1 id="heroTitle"></h1>
       <p id="heroText"></p>
-      <div class="horizon" id="horizon" role="group" aria-label="Show the risks today or around 2050" hidden>
-        <button type="button" class="horizon-btn" data-horizon="today" aria-pressed="true">Today</button>
-        <button type="button" class="horizon-btn" data-horizon="2050" aria-pressed="false">2050</button>
+      <!-- What already happened here, the risks today or around 2050; and the public money
+           that can pay for the plan. -->
+      <div class="hero-controls" id="heroControls" hidden>
+        <div class="horizon" id="horizon" role="group" aria-label="Show this home before, today or around 2050">
+          <button type="button" class="horizon-btn" data-horizon="before" aria-pressed="false">Before</button>
+          <button type="button" class="horizon-btn" data-horizon="today" aria-pressed="true">Today</button>
+          <button type="button" class="horizon-btn" data-horizon="2050" aria-pressed="false">2050</button>
+        </div>
+        <button type="button" class="programmes-btn" id="grantsBtn" aria-haspopup="dialog" aria-controls="grantsDialog" hidden>
+          <span class="money-icon" aria-hidden="true">€</span>Public programmes</button>
       </div>
     </div>
     <div class="hero-media">
@@ -170,7 +184,7 @@
         <span class="kit-total" id="kitTotal"></span>
       </div>
       <button type="button" class="more" data-plan-open="emergency">See the full action plan →</button>
-      <a class="adv-link" id="advancedLink" href="/kit" data-nav>Or see the Advanced Kit →</a>
+      <a class="adv-link" id="advancedLink" href="/kit" data-nav>Or see the Basic emergency kit →</a>
     </div>
   </section>
 
@@ -189,13 +203,13 @@
   <p class="shop-note" id="shopNote"></p>
   </div>
 
-  <!-- ------------------------------------------------ The Advanced Kit -->
+  <!-- ------------------------------------------------ The basic emergency kit -->
   <div class="page" id="kitPage" hidden>
   <section class="adv-hero">
     <div class="adv-intro">
       <div class="adv-eyebrow">
-        <span class="adv-badge">Advanced Kit</span>
-        <span class="adv-step">Step two, once the basics are covered</span>
+        <span class="adv-badge">Basic emergency kit</span>
+        <span class="adv-step">The same for every home, whatever its risks</span>
       </div>
       <h1>For the days the services stop.</h1>
       <p id="advLead"></p>
@@ -212,7 +226,7 @@
     </ul>
   </section>
 
-  <section class="adv-grid" id="advGrid" aria-label="The Advanced Kit"></section>
+  <section class="adv-grid" id="advGrid" aria-label="The basic emergency kit"></section>
 
   <p class="shop-note" id="advNote"></p>
   </div>
@@ -245,7 +259,7 @@
     </div>
   </div>
 
-  <!-- The Advanced Kit, store by store -->
+  <!-- The basic emergency kit, store by store -->
   <div class="overlay" id="advDialog" hidden>
     <div class="overlay-backdrop" data-close></div>
     <div class="overlay-panel adv-panel glass-solid" role="dialog" aria-modal="true" aria-labelledby="advDialogTitle">

@@ -243,7 +243,7 @@ narrates and listens; it never touches a number.
 | `fal-ai/nano-banana-2/edit` | The six flood depths as edits of one street |
 | `openai/gpt-image-2/edit` | The two deepest flood bands (2 m and 3 m of water) |
 | `fal-ai/kling-video/v2.5-turbo/pro/image-to-video` | 5-second clips from the stills |
-| `fal-ai/elevenlabs/tts/turbo-v2.5` (voice "Brian") | Narration of the video briefing |
+| `fal-ai/elevenlabs/tts/eleven-v3` (voice "Brian") | Narration of the video briefing |
 | `fal-ai/elevenlabs/speech-to-text/scribe-v2` | The microphone in the address box |
 
 - **Illustration library**: 19 clips generated once by `scripts/fal_media.py` and kept in

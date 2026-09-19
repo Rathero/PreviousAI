@@ -228,7 +228,7 @@ PRODUCTS = {
 
 
 # --------------------------------------------------------------------------- #
-# The Advanced Kit: step two, once the basics are covered
+# The basic emergency kit (ADVANCED_KIT: the app called it the Advanced Kit at first)
 # --------------------------------------------------------------------------- #
 # The same seven things for every home: they keep working with no electricity, no phone
 # network and no shop open, the first 72 hours after a big fire or flood. Prices are
@@ -277,8 +277,8 @@ KIT_NOTE = ("The gas stove needs butane cartridges, sold separately; use it in a
 
 
 def advanced_kit() -> dict:
-    """The Advanced Kit as the app shows it: each item with its store and link, the total
-    and how many stores it takes."""
+    """The basic emergency kit as the app shows it: each item with its store and link, the
+    total and how many stores it takes."""
     items = []
     for item in ADVANCED_KIT:
         store, search = KIT_STORES[item["store"]]

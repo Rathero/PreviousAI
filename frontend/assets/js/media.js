@@ -77,13 +77,15 @@ function renderThumb() {
   teardownThumbMap();
   const ill = selected && selected.illustration;
   if (ill) {
+    const sim = ill.kind === "simulation";
     // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
     setHtml(el, `<video ${REDUCED_MOTION ? "" : "autoplay loop"} muted playsinline preload="auto"
       poster="${esc(ill.poster || "")}" src="${esc(ill.video)}"></video>`);
-    label.textContent = "AI illustration";
+    label.textContent = sim ? "AI simulation" : "AI illustration";
     btn.disabled = false;
-    btn.setAttribute("aria-label",
-      `See what ${selected.label.toLowerCase()} could look like: an AI illustration of a generic place`);
+    btn.setAttribute("aria-label", sim
+      ? `See ${selected.label.toLowerCase()} simulated by AI on a photo of this street`
+      : `See what ${selected.label.toLowerCase()} could look like: an AI illustration of a generic place`);
     return;
   }
   if (failure) {
@@ -178,9 +180,11 @@ function renderAerial() {
 
 function renderIllustration(risk) {
   const ill = risk.illustration;
+  // A simulation is drawn on a photo of this street; an illustration is a generic place.
+  const sim = ill.kind === "simulation";
   const el = box();
   teardownMap();
-  header(`${risk.label} · what it could look like`, "");
+  header(`${risk.label} · ${sim ? "simulated on this street" : "what it could look like"}`, "");
   const c = ill.chosen_by || {};
   const chosen = c.shown ? `Chosen by ${esc(c.label.toLowerCase())}: ${esc(c.shown)}.` : "";
   const others = previews.length > 1
@@ -191,11 +195,11 @@ function renderIllustration(risk) {
   setHtml(el, `
     <video class="media-fill" ${REDUCED_MOTION ? "controls" : "autoplay loop"} muted playsinline preload="auto"
       poster="${esc(ill.poster || "")}" src="${esc(ill.video)}"
-      aria-label="${esc(ill.title)}. AI illustration of a generic place"></video>
-    <span class="media-badge">AI illustration · not this place</span>${others}
+      aria-label="${esc(ill.title)}. ${sim ? "AI simulation on a photo of this street" : "AI illustration of a generic place"}"></video>
+    <span class="media-badge">${sim ? "AI simulation · this street" : "AI illustration · not this place"}</span>${others}
     <div class="media-caption"><b>${esc(ill.title)}.</b> ${esc(ill.caption)}
       ${risk.home_note ? `<span class="home-note">${esc(risk.home_note)}</span>` : ""}
-      <span class="fine">${chosen} ${esc(ill.limitation || "")}</span></div>`);
+      <span class="fine">${chosen} ${esc(ill.limitation || "")} ${esc(ill.credit || "")}</span></div>`);
 }
 
 async function runBriefing(ctx) {
