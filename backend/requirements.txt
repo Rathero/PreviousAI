@@ -1,0 +1,11 @@
+# Web API. The indicator engine is pure Python: no numpy or pandas on the request path.
+fastapi>=0.115
+uvicorn[standard]>=0.30
+httpx>=0.27
+python-dotenv>=1.0
+
+# Generated media. Optional: without them the API still starts, but there is no
+# voice input, no video briefing and no new illustration clips.
+fal-client>=1.0        # fal.ai queue, results and CDN uploads
+pillow>=11.0           # on-screen text of the video briefing
+imageio-ffmpeg>=0.6    # a bundled ffmpeg binary, nothing to install by hand

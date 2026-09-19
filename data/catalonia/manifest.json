@@ -1,0 +1,70 @@
+{
+  "fires": {
+    "fires": 1011,
+    "polygons": 4712,
+    "period": "1986-2024",
+    "simplification_m": 10.0,
+    "downloaded_at": "2026-09-16T20:03:09+00:00"
+  },
+  "stats": {
+    "datasets": {
+      "bks7-dkfd": {
+        "label": "2011-2024",
+        "rows": 7545,
+        "added": 7545,
+        "years": [
+          2011,
+          2012,
+          2013,
+          2014,
+          2015,
+          2016,
+          2017,
+          2018,
+          2019,
+          2020,
+          2021,
+          2022,
+          2023,
+          2024
+        ]
+      },
+      "crs7-idxi": {
+        "label": "previous year",
+        "rows": 495,
+        "added": 495,
+        "years": [
+          2025
+        ]
+      },
+      "9r29-e8ha": {
+        "label": "current year",
+        "rows": 646,
+        "added": 646,
+        "years": [
+          2026
+        ]
+      }
+    },
+    "fires": 8686,
+    "period": "2011-2026",
+    "downloaded_at": "2026-09-16T19:34:31+00:00"
+  },
+  "agora": {
+    "municipalities": 947,
+    "episodes": 228,
+    "episodes_period": "1902-2020",
+    "episodes_first": "1902-08-02",
+    "episodes_last": "2020-09-21",
+    "downloaded_at": "2026-09-16T19:34:45+00:00"
+  },
+  "avalanches": {
+    "zones": 17811,
+    "observations": 6468,
+    "surveys": 739,
+    "nivo_zones": 7,
+    "observations_period": "1971-2024",
+    "simplification_m": 10.0,
+    "downloaded_at": "2026-09-19T10:29:54+00:00"
+  }
+}

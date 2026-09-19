@@ -1,0 +1,1 @@
+{"stored_at": 1789816467.3580725, "key": "dfd3deabc9a1f545fd0d0967f87918249b2e7ea227d332669e28c2dfe46cc1d3", "value": {"answers": {"relation": {"type": "choice", "choice": "contradicts", "confidence": 1.0, "probabilities": {"supports": 0.0, "contradicts": 1.0, "says_nothing": 0.0}}}, "model": "jev-1.13.0", "usage": {"input_tokens": 1420, "output_tokens": 46}}}

@@ -1,0 +1,9 @@
+# Batch data pipelines (backend/scripts/). The API starts and works without them.
+
+# Climate Data Store NetCDF processing (cds_build_baseline.py, cds_hazards.py).
+xarray>=2024.1
+netCDF4>=1.7
+numpy>=1.26
+
+# Wildfire perimeter shapefiles of the Government of Catalonia (catalonia_build.py).
+pyshp>=2.3

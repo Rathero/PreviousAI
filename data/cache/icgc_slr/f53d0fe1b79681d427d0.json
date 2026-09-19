@@ -1,0 +1,1 @@
+{"stored_at": 1789815534.2911131, "key": "slr:41.48125,2.33033", "value": {"threshold_m": 0.077, "threshold_layer": "cat_0.077cm_rc1", "min_modelled_m": 0.077, "max_modelled_m": 0.848, "layers": 44, "requests": 7, "source": "https://geoserveis.icgc.cat/servei/catalunya/inundacio-litoral-1x1/wms"}}

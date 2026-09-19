@@ -1,0 +1,523 @@
+{
+  "name": "valencia",
+  "dataset": "derived-era5-single-levels-daily-statistics",
+  "source": "ERA5 (Copernicus C3S) via Climate Data Store",
+  "resolution": "0.25 degrees (~28 km)",
+  "period": "2024-2024",
+  "bbox": [
+    40.0,
+    -1.0,
+    38.75,
+    0.25
+  ],
+  "files": [
+    "valencia_2m_temperature_daily_maximum_2024_2024",
+    "valencia_2m_temperature_daily_minimum_2024_2024"
+  ],
+  "cells": [
+    {
+      "lat": 40.0,
+      "lon": -1.0,
+      "indicators": {
+        "hot_days_35": 1.9959016393442623,
+        "hot_days_32": 18.961065573770494,
+        "hot_days_40": 0.0,
+        "heat_record": 35.698883056640625,
+        "frost_days": 26.94467213114754,
+        "severe_frost_days": 0.9979508196721312,
+        "tropical_nights": 0.9979508196721312,
+        "cold_record": -5.165130615234375
+      }
+    },
+    {
+      "lat": 40.0,
+      "lon": -0.75,
+      "indicators": {
+        "hot_days_35": 0.9979508196721312,
+        "hot_days_32": 7.983606557377049,
+        "hot_days_40": 0.0,
+        "heat_record": 35.652008056640625,
+        "frost_days": 9.97950819672131,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 0.0,
+        "cold_record": -4.016693115234375
+      }
+    },
+    {
+      "lat": 40.0,
+      "lon": -0.5,
+      "indicators": {
+        "hot_days_35": 0.9979508196721312,
+        "hot_days_32": 13.971311475409836,
+        "hot_days_40": 0.0,
+        "heat_record": 35.617584228515625,
+        "frost_days": 5.9877049180327875,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 3.9918032786885247,
+        "cold_record": -2.179290771484375
+      }
+    },
+    {
+      "lat": 40.0,
+      "lon": -0.25,
+      "indicators": {
+        "hot_days_35": 0.0,
+        "hot_days_32": 15.967213114754099,
+        "hot_days_40": 0.0,
+        "heat_record": 34.564849853515625,
+        "frost_days": 0.9979508196721312,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 51.893442622950815,
+        "cold_record": -0.169036865234375
+      }
+    },
+    {
+      "lat": 40.0,
+      "lon": 0.0,
+      "indicators": {
+        "hot_days_35": 0.0,
+        "hot_days_32": 3.9918032786885247,
+        "hot_days_40": 0.0,
+        "heat_record": 32.808990478515625,
+        "frost_days": 0.0,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 77.84016393442623,
+        "cold_record": 2.426666259765625
+      }
+    },
+    {
+      "lat": 40.0,
+      "lon": 0.25,
+      "indicators": {
+        "hot_days_35": 0.0,
+        "hot_days_32": 0.0,
+        "hot_days_40": 0.0,
+        "heat_record": 30.737701416015625,
+        "frost_days": 0.0,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 110.77254098360656,
+        "cold_record": 6.450103759765625
+      }
+    },
+    {
+      "lat": 39.75,
+      "lon": -1.0,
+      "indicators": {
+        "hot_days_35": 8.98155737704918,
+        "hot_days_32": 36.924180327868854,
+        "hot_days_40": 0.0,
+        "heat_record": 38.446929931640625,
+        "frost_days": 8.98155737704918,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 0.9979508196721312,
+        "cold_record": -2.853118896484375
+      }
+    },
+    {
+      "lat": 39.75,
+      "lon": -0.75,
+      "indicators": {
+        "hot_days_35": 3.9918032786885247,
+        "hot_days_32": 28.940573770491806,
+        "hot_days_40": 0.0,
+        "heat_record": 38.296295166015625,
+        "frost_days": 5.9877049180327875,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 13.971311475409836,
+        "cold_record": -2.293548583984375
+      }
+    },
+    {
+      "lat": 39.75,
+      "lon": -0.5,
+      "indicators": {
+        "hot_days_35": 2.9938524590163937,
+        "hot_days_32": 23.95081967213115,
+        "hot_days_40": 0.0,
+        "heat_record": 36.199615478515625,
+        "frost_days": 1.9959016393442623,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 46.903688524590166,
+        "cold_record": -0.442962646484375
+      }
+    },
+    {
+      "lat": 39.75,
+      "lon": -0.25,
+      "indicators": {
+        "hot_days_35": 0.0,
+        "hot_days_32": 8.98155737704918,
+        "hot_days_40": 0.0,
+        "heat_record": 33.615631103515625,
+        "frost_days": 0.0,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 81.83196721311475,
+        "cold_record": 3.293853759765625
+      }
+    },
+    {
+      "lat": 39.75,
+      "lon": 0.0,
+      "indicators": {
+        "hot_days_35": 0.0,
+        "hot_days_32": 0.0,
+        "hot_days_40": 0.0,
+        "heat_record": 28.773345947265625,
+        "frost_days": 0.0,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 128.73565573770492,
+        "cold_record": 9.170074462890625
+      }
+    },
+    {
+      "lat": 39.75,
+      "lon": 0.25,
+      "indicators": {
+        "hot_days_35": 0.0,
+        "hot_days_32": 0.0,
+        "hot_days_40": 0.0,
+        "heat_record": 28.400421142578125,
+        "frost_days": 0.0,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 135.72131147540983,
+        "cold_record": 10.275787353515625
+      }
+    },
+    {
+      "lat": 39.5,
+      "lon": -1.0,
+      "indicators": {
+        "hot_days_35": 12.973360655737704,
+        "hot_days_32": 39.91803278688524,
+        "hot_days_40": 0.0,
+        "heat_record": 38.989898681640625,
+        "frost_days": 5.9877049180327875,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 19.95901639344262,
+        "cold_record": -2.243988037109375
+      }
+    },
+    {
+      "lat": 39.5,
+      "lon": -0.75,
+      "indicators": {
+        "hot_days_35": 11.975409836065575,
+        "hot_days_32": 39.91803278688524,
+        "hot_days_40": 0.9979508196721312,
+        "heat_record": 40.270904541015625,
+        "frost_days": 0.0,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 34.928278688524586,
+        "cold_record": 0.698150634765625
+      }
+    },
+    {
+      "lat": 39.5,
+      "lon": -0.5,
+      "indicators": {
+        "hot_days_35": 2.9938524590163937,
+        "hot_days_32": 22.952868852459016,
+        "hot_days_40": 0.0,
+        "heat_record": 36.671295166015625,
+        "frost_days": 0.0,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 82.82991803278689,
+        "cold_record": 3.332183837890625
+      }
+    },
+    {
+      "lat": 39.5,
+      "lon": -0.25,
+      "indicators": {
+        "hot_days_35": 0.0,
+        "hot_days_32": 2.9938524590163937,
+        "hot_days_40": 0.0,
+        "heat_record": 33.504302978515625,
+        "frost_days": 0.0,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 107.77868852459017,
+        "cold_record": 6.396636962890625
+      }
+    },
+    {
+      "lat": 39.5,
+      "lon": 0.0,
+      "indicators": {
+        "hot_days_35": 0.0,
+        "hot_days_32": 0.0,
+        "hot_days_40": 0.0,
+        "heat_record": 28.884307861328125,
+        "frost_days": 0.0,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 134.7233606557377,
+        "cold_record": 10.063140869140625
+      }
+    },
+    {
+      "lat": 39.5,
+      "lon": 0.25,
+      "indicators": {
+        "hot_days_35": 0.0,
+        "hot_days_32": 0.0,
+        "hot_days_40": 0.0,
+        "heat_record": 28.903839111328125,
+        "frost_days": 0.0,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 137.7172131147541,
+        "cold_record": 10.639801025390625
+      }
+    },
+    {
+      "lat": 39.25,
+      "lon": -1.0,
+      "indicators": {
+        "hot_days_35": 11.975409836065575,
+        "hot_days_32": 36.924180327868854,
+        "hot_days_40": 0.0,
+        "heat_record": 38.626129150390625,
+        "frost_days": 3.9918032786885247,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 17.96311475409836,
+        "cold_record": -1.901702880859375
+      }
+    },
+    {
+      "lat": 39.25,
+      "lon": -0.75,
+      "indicators": {
+        "hot_days_35": 15.967213114754099,
+        "hot_days_32": 52.89139344262295,
+        "hot_days_40": 0.9979508196721312,
+        "heat_record": 40.946685791015625,
+        "frost_days": 0.0,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 40.915983606557376,
+        "cold_record": 0.097320556640625
+      }
+    },
+    {
+      "lat": 39.25,
+      "lon": -0.5,
+      "indicators": {
+        "hot_days_35": 13.971311475409836,
+        "hot_days_32": 57.88114754098361,
+        "hot_days_40": 0.9979508196721312,
+        "heat_record": 40.536529541015625,
+        "frost_days": 0.0,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 77.84016393442623,
+        "cold_record": 2.185943603515625
+      }
+    },
+    {
+      "lat": 39.25,
+      "lon": -0.25,
+      "indicators": {
+        "hot_days_35": 1.9959016393442623,
+        "hot_days_32": 22.952868852459016,
+        "hot_days_40": 0.0,
+        "heat_record": 36.648345947265625,
+        "frost_days": 0.0,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 107.77868852459017,
+        "cold_record": 5.159088134765625
+      }
+    },
+    {
+      "lat": 39.25,
+      "lon": 0.0,
+      "indicators": {
+        "hot_days_35": 0.0,
+        "hot_days_32": 0.0,
+        "hot_days_40": 0.0,
+        "heat_record": 29.607574462890625,
+        "frost_days": 0.0,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 139.71311475409834,
+        "cold_record": 9.805572509765625
+      }
+    },
+    {
+      "lat": 39.25,
+      "lon": 0.25,
+      "indicators": {
+        "hot_days_35": 0.0,
+        "hot_days_32": 0.0,
+        "hot_days_40": 0.0,
+        "heat_record": 28.849151611328125,
+        "frost_days": 0.0,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 138.71516393442622,
+        "cold_record": 10.415191650390625
+      }
+    },
+    {
+      "lat": 39.0,
+      "lon": -1.0,
+      "indicators": {
+        "hot_days_35": 18.961065573770494,
+        "hot_days_32": 47.9016393442623,
+        "hot_days_40": 0.9979508196721312,
+        "heat_record": 40.223785400390625,
+        "frost_days": 1.9959016393442623,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 20.956967213114755,
+        "cold_record": -2.039398193359375
+      }
+    },
+    {
+      "lat": 39.0,
+      "lon": -0.75,
+      "indicators": {
+        "hot_days_35": 23.95081967213115,
+        "hot_days_32": 56.88319672131148,
+        "hot_days_40": 1.9959016393442623,
+        "heat_record": 40.817779541015625,
+        "frost_days": 1.9959016393442623,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 44.9077868852459,
+        "cold_record": -0.658538818359375
+      }
+    },
+    {
+      "lat": 39.0,
+      "lon": -0.5,
+      "indicators": {
+        "hot_days_35": 18.961065573770494,
+        "hot_days_32": 58.87909836065574,
+        "hot_days_40": 0.9979508196721312,
+        "heat_record": 41.022857666015625,
+        "frost_days": 0.0,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 65.86475409836066,
+        "cold_record": 1.034820556640625
+      }
+    },
+    {
+      "lat": 39.0,
+      "lon": -0.25,
+      "indicators": {
+        "hot_days_35": 2.9938524590163937,
+        "hot_days_32": 22.952868852459016,
+        "hot_days_40": 0.0,
+        "heat_record": 38.108795166015625,
+        "frost_days": 0.0,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 92.8094262295082,
+        "cold_record": 4.276275634765625
+      }
+    },
+    {
+      "lat": 39.0,
+      "lon": 0.0,
+      "indicators": {
+        "hot_days_35": 0.0,
+        "hot_days_32": 0.0,
+        "hot_days_40": 0.0,
+        "heat_record": 30.835357666015625,
+        "frost_days": 0.0,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 127.73770491803279,
+        "cold_record": 9.188629150390625
+      }
+    },
+    {
+      "lat": 39.0,
+      "lon": 0.25,
+      "indicators": {
+        "hot_days_35": 0.0,
+        "hot_days_32": 0.0,
+        "hot_days_40": 0.0,
+        "heat_record": 29.239776611328125,
+        "frost_days": 0.0,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 136.719262295082,
+        "cold_record": 10.174957275390625
+      }
+    },
+    {
+      "lat": 38.75,
+      "lon": -1.0,
+      "indicators": {
+        "hot_days_35": 27.942622950819672,
+        "hot_days_32": 47.9016393442623,
+        "hot_days_40": 0.9979508196721312,
+        "heat_record": 40.407379150390625,
+        "frost_days": 0.9979508196721312,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 34.928278688524586,
+        "cold_record": -1.748382568359375
+      }
+    },
+    {
+      "lat": 38.75,
+      "lon": -0.75,
+      "indicators": {
+        "hot_days_35": 25.946721311475407,
+        "hot_days_32": 50.89549180327868,
+        "hot_days_40": 0.9979508196721312,
+        "heat_record": 40.001617431640625,
+        "frost_days": 0.9979508196721312,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 44.9077868852459,
+        "cold_record": -1.135101318359375
+      }
+    },
+    {
+      "lat": 38.75,
+      "lon": -0.5,
+      "indicators": {
+        "hot_days_35": 12.973360655737704,
+        "hot_days_32": 44.9077868852459,
+        "hot_days_40": 0.0,
+        "heat_record": 39.247711181640625,
+        "frost_days": 0.9979508196721312,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 50.89549180327868,
+        "cold_record": -0.449554443359375
+      }
+    },
+    {
+      "lat": 38.75,
+      "lon": -0.25,
+      "indicators": {
+        "hot_days_35": 1.9959016393442623,
+        "hot_days_32": 18.961065573770494,
+        "hot_days_40": 0.0,
+        "heat_record": 35.984283447265625,
+        "frost_days": 0.0,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 67.86065573770492,
+        "cold_record": 2.821929931640625
+      }
+    },
+    {
+      "lat": 38.75,
+      "lon": 0.0,
+      "indicators": {
+        "hot_days_35": 0.0,
+        "hot_days_32": 7.983606557377049,
+        "hot_days_40": 0.0,
+        "heat_record": 33.968170166015625,
+        "frost_days": 0.0,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 102.7889344262295,
+        "cold_record": 6.991851806640625
+      }
+    },
+    {
+      "lat": 38.75,
+      "lon": 0.25,
+      "indicators": {
+        "hot_days_35": 0.0,
+        "hot_days_32": 0.0,
+        "hot_days_40": 0.0,
+        "heat_record": 29.349273681640625,
+        "frost_days": 0.0,
+        "severe_frost_days": 0.0,
+        "tropical_nights": 133.72540983606558,
+        "cold_record": 9.997222900390625
+      }
+    }
+  ]
+}

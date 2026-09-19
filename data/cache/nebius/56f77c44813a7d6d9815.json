@@ -1,0 +1,1 @@
+{"stored_at": 1789821149.2325788, "key": "d7a5fc6b2bc097c4b106a97adb6a565088a98c088096c748536a730e594cfb9f", "value": {"answers": {"a0": {"type": "noul", "noul": 1.0}, "a1": {"type": "noul", "noul": 0.5927}, "a2": {"type": "noul", "noul": 0.9991}}, "model": "Qwen/Qwen3-235B-A22B-Instruct-2507", "usage": {"input_tokens": 548, "output_tokens": 22}, "cost_usd": 0.0001228}}
