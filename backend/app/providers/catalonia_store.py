@@ -77,14 +77,12 @@ class CataloniaStore:
                 continue
             polys = _as_polys(m["polygons"])
             if geo.point_in_multipolygon(x, y, polys):
-                return {**{k: m[k] for k in ("code", "name", "comarca", "province")},
-                        "match": "inside", "distance_m": 0}
+                return {**_public(m), "match": "inside", "distance_m": 0}
             d = geo.distance_to_polygons(x, y, polys)
             if d < nearest_d:
                 nearest, nearest_d = m, d
         if nearest is not None and nearest_d <= tolerance_m:
-            return {**{k: nearest[k] for k in ("code", "name", "comarca", "province")},
-                    "match": "nearest", "distance_m": round(nearest_d)}
+            return {**_public(nearest), "match": "nearest", "distance_m": round(nearest_d)}
         return None
 
     def flood_episodes(self, municipality_code: str) -> list[dict]:
@@ -187,6 +185,14 @@ def to_latlon(raw, tolerance_m: float = 25) -> list:
 
 def _as_polys(raw) -> list[list[list[tuple[float, float]]]]:
     return [[[(p[0], p[1]) for p in ring] for ring in rings] for rings in raw]
+
+
+def _public(m: dict) -> dict:
+    """A municipality as the reports name it. Catalan writes the article in lower case
+    ("el Masnou"); English text opens the name with a capital ("El Masnou")."""
+    out = {k: m[k] for k in ("code", "name", "comarca", "province")}
+    out["name"] = out["name"][:1].upper() + out["name"][1:]
+    return out
 
 
 @lru_cache(maxsize=1)
