@@ -1,4 +1,5 @@
-// Entry point: two views, one page. "/" asks for the home; "/report?address=..." shows it.
+// Entry point: two views, one page. "/" asks for the home; "/report?address=..." shows its
+// risks and "/shop?address=..." what it needs, from the same report.
 
 import { api } from "./api.js";
 import { initHome, showHome } from "./home.js";
@@ -17,11 +18,12 @@ function route() {
   const url = new URL(window.location.href);
   const home = document.getElementById("home");
   const report = document.getElementById("report");
-  if (url.pathname === "/report" && url.searchParams.get("address")) {
+  const page = { "/report": "risks", "/shop": "shop" }[url.pathname];
+  if (page && url.searchParams.get("address")) {
     home.hidden = true;
     report.hidden = false;
-    document.title = `${url.searchParams.get("address")} · Previous AI`;
-    showReport(url.searchParams);
+    document.title = `${page === "shop" ? "What this home needs · " : ""}${url.searchParams.get("address")} · Previous AI`;
+    showReport(url.searchParams, page);
   } else {
     report.hidden = true;
     home.hidden = false;

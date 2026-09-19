@@ -249,30 +249,30 @@ def _highlights(report: dict) -> list[dict]:
     out = []
     n = _count(report, "flood_history", "flood_episodes")
     if n:
-        out.append({"number": str(n[0]), "family": "flood",
+        out.append({"number": str(n[0]), "family": "flood", "icon": "waves",
                     "text": f"flood{'s' if n[0] != 1 else ''} in the municipality since {n[1]}."})
     n = _count(report, "fire_history", "fires_5km")
     if n:
-        out.append({"number": str(n[0]), "family": "wildfire",
+        out.append({"number": str(n[0]), "family": "wildfire", "icon": "flame",
                     "text": f"wildfire{'s' if n[0] != 1 else ''} within 5 km since {n[1]}."})
     sat = _satellite_fires(report)
     if sat:
         this_year = [f for f in sat if f["first"][:4] == str(dt.date.today().year)]
         pool, when = (this_year, "this year") if this_year else (sat, f"since {sat[-1]['first'][:4]}")
-        out.append({"number": str(len(pool)), "family": "wildfire",
+        out.append({"number": str(len(pool)), "family": "wildfire", "icon": "satellite",
                     "text": f"fire{'s' if len(pool) != 1 else ''} seen by satellite within 10 km {when}."})
     n = _count(report, "avalanche", "avalanche_observed")
     if n:
-        out.append({"number": str(n[0]), "family": "avalanche",
+        out.append({"number": str(n[0]), "family": "avalanche", "icon": "mountain",
                     "text": f"avalanche{'s' if n[0] != 1 else ''} observed within 1 km since {n[1]}."})
     events, since = report.get("events") or {}, _since(report)
     hottest = (events.get("hottest_days") or [None])[0]
     if hottest and len(out) < 3:
-        out.append({"number": f"{hottest['value']:.0f} °C", "family": "heat",
+        out.append({"number": f"{hottest['value']:.0f} °C", "family": "heat", "icon": "sun",
                     "text": f"on the hottest day since {since}, in {hottest['date'][:4]}."})
     wettest = (events.get("wettest_days") or [None])[0]
     if wettest and len(out) < 3:
-        out.append({"number": f"{wettest['value']:.0f} mm", "family": "flood",
+        out.append({"number": f"{wettest['value']:.0f} mm", "family": "flood", "icon": "rain",
                     "text": f"of rain on the wettest day since {since}, in {wettest['date'][:4]}."})
     return out[:3]
 
@@ -287,7 +287,7 @@ def _verb(group: list[dict]) -> str:
 
 
 def headline(tiles: list[dict]) -> dict:
-    """The sentence that sums the four risks up, and the lines that explain it."""
+    """The sentence that sums the four risks up, and the line that says how they stand."""
     scored = sorted((r for r in tiles if r["score"] is not None), key=lambda r: -r["score"])
     worth = [r for r in scored if r["score"] >= WORTH]
     calm = [r for r in scored if r["score"] < WORTH]
@@ -301,10 +301,8 @@ def headline(tiles: list[dict]) -> dict:
             groups.append((r["level"], [r]))
     sentences = [f"{_names(g)} {_verb(g)} {level}{' here' if i == 0 else ''}."
                  for i, (level, g) in enumerate(groups)]
-    if calm:
-        sentences.append(f"{_names(calm)} {_verb(calm)} not a concern{' here' if not worth else ''}.")
-    sentences.append("Pick one below to see what happened and what to do." if worth
-                     else "Pick one below to see what happened.")
+    if not worth and calm:
+        sentences.append(f"{_names(calm)} {_verb(calm)} not a concern here.")
     return {"title": title, "text": " ".join(sentences)}
 
 

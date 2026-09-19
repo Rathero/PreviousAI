@@ -11,7 +11,7 @@ score.
 - **One sentence** that sums the home up ("Two things are worth preparing for at this
   home"), next to a picture of it (Google Street View; aerial imagery when there is no
   panorama) and a narrated **video briefing** of the report.
-- **Four risks**, each with its level (0–100) and one fact. Picking one turns the page to
+- **Four risks**, each as wide as its level (0–100), with one fact. Picking one turns the page to
   its colours, shows what already happened near the home (flood episodes, wildfires, fires
   seen by satellite, avalanches, the wettest and hottest days on record), what it means for
   this home (a 4th-floor flat is not a ground floor) and its first steps; the picture
@@ -21,6 +21,10 @@ score.
   buy comes with real products: the store's photo, the price and a direct link to buy it.
   Tick items off as you go; tell us who lives there and the plan puts first what matters
   for them.
+- **What this home needs** (`/shop`): the plan's shopping steps as a kit of four real
+  products (taking turns between the risks worth preparing for), its total, the free steps
+  that help most and the service a partner offers for the worst risk; mark what you
+  already have and the kit shrinks.
 - **PDF report** to keep and share: the pictures of the home, every value behind each
   score with its period and source, what already happened, the climate to 2050, the full
   action plan with its partners and the sources. On a phone it opens the share sheet.

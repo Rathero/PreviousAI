@@ -1,6 +1,7 @@
 // The risk report: a sentence that sums the home up, the four risks, what already
 // happened near it and the plan to prepare. Picking a risk shows its story and its
-// first steps, and turns the background to its colours.
+// first steps, and turns the background to its colours. A second page, "What this home
+// needs", turns the plan's shopping steps into a kit of real products.
 
 import { api } from "./api.js";
 import { media } from "./media.js";
@@ -8,8 +9,10 @@ import { $, $$, esc, niceDate, PROFILES, store, homeLabel, addressKey } from "./
 
 const ORDER = ["wildfire", "flood", "heat", "avalanche"];
 const NAMES = { wildfire: "Fire", flood: "Flooding", heat: "Heat waves", avalanche: "Avalanches" };
-const SEGMENTS = 10;
 const FIRST_STEPS = 3;
+const KIT_SIZE = 4;
+const TAGS = { wildfire: "Fire", flood: "Flood", heat: "Heat", avalanche: "Avalanche", emergency: "Emergency" };
+const COUNT = ["", "One thing", "Two things", "Three things", "Four things"];
 const CHECKABLE = new Set(["before", "buy", "first"]);
 const PROGRESS = [
   "Reading decades of daily climate records…",
@@ -29,6 +32,35 @@ const ICONS = {
 };
 const CHECK_SVG = `<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="rgba(166,226,46,0.9)"
   stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>`;
+// The small icons next to the numbers of what happened.
+const FACT_ICONS = {
+  waves: '<path d="M3 8.2c1.8 1.7 3.6 1.7 5.4 0s3.6-1.7 5.4 0 3.6 1.7 5.4 0"></path>'
+    + '<path d="M3 12.8c1.8 1.7 3.6 1.7 5.4 0s3.6-1.7 5.4 0 3.6 1.7 5.4 0"></path>'
+    + '<path d="M3 17.4c1.8 1.7 3.6 1.7 5.4 0s3.6-1.7 5.4 0 3.6 1.7 5.4 0"></path>',
+  flame: ICONS.wildfire,
+  satellite: '<circle cx="12" cy="12" r="1.6"></circle><path d="M8.6 15.4a4.8 4.8 0 0 1 0-6.8M15.4 8.6a4.8 4.8 0 0 1 0 6.8"></path>'
+    + '<path d="M5.8 18.2a8.8 8.8 0 0 1 0-12.4M18.2 5.8a8.8 8.8 0 0 1 0 12.4"></path>',
+  mountain: ICONS.avalanche,
+  sun: ICONS.heat,
+  rain: ICONS.flood,
+};
+const FAMILY_ICON = { flood: "waves", wildfire: "flame", heat: "sun", avalanche: "mountain" };
+const SHIELD_SVG = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#A6E22E" stroke-width="1.3"
+  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5 5.5 6v5.5c0 4.2 2.8 7.3 6.5 9 3.7-1.7 6.5-4.8 6.5-9V6z"></path>
+  <path d="m9.3 12.2 1.9 1.9 3.6-3.6"></path></svg>`;
+const TICK_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A6E22E" stroke-width="2"
+  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>`;
+// The service a home worth preparing for can ask a partner for, by its worst risk.
+const SERVICES = {
+  wildfire: { partner: "verisure", title: "Monitored alarm with smoke detection",
+    text: "A monitoring centre watches the detectors and calls the fire brigade, even when you are away." },
+  flood: { partner: "verisure", title: "Monitored alarm with a flood detector",
+    text: "You are told the moment water reaches the detector, even when you are away." },
+  avalanche: { partner: "applus", title: "Roof and structure inspection",
+    text: "A certified engineer checks how the roof and the walls facing the slope would take the snow." },
+  heat: { partner: "mitsubishi_electric", title: "A heat pump, installed",
+    text: "It cools the home on the hottest days and heats it in winter, fitted by an installer." },
+};
 
 let app = null;
 let params = null;       // {address, home, floor, who}
@@ -38,6 +70,7 @@ let token = 0;
 let abort = null;
 let active = null;       // the risk picked on the page
 let horizon = "today";   // the risks as they are today, or around 2050
+let page = "risks";      // "risks", or "shop": what this home needs
 let activePlan = "emergency";
 let progressTimer = null;
 let householdDraft = [];
@@ -76,7 +109,8 @@ function segmentsHtml(segments) {
 
 // A product proposed for a step: the store's photo, what it is, the price and a direct
 // link to the store's page. Photos load from the stores without a referrer.
-const EUROS = new Intl.NumberFormat("en-IE", { style: "currency", currency: "EUR" });
+const EUROS = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" });
+const EUROS_ROUND = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 
 function productHtml(p) {
   return `<a class="product" href="${esc(p.url)}" target="_blank" rel="noopener${p.partner ? " sponsored" : ""}">
@@ -168,28 +202,27 @@ function heroError(message) {
 }
 
 // ------------------------------------------------------------------ tiles
-function bars(score) {
-  const lit = score == null || score <= 0 ? 0 : Math.max(1, Math.round(score / 10));
-  return Array.from({ length: SEGMENTS }, (_, i) => `<i${i < lit ? ' class="on"' : ""}></i>`).join("");
+// Each tile is as wide as its score: the worst risks take the room.
+function grow(risk) { return risk && risk.score != null ? risk.score : 1; }
+
+function tileIcon(key) {
+  return `<svg class="tile-icon" width="34" height="34" viewBox="0 0 24 24" fill="none" stroke-width="1.2"
+    stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[key]}</svg>`;
 }
 
 function tileHtml(key, risk) {
-  if (risk && horizon === "2050" && data && data.ahead) return futureTileHtml(key);
+  if (risk && horizon === "2050" && data && data.ahead) return futureTileHtml(key, risk);
   const loading = !risk;
   const score = risk ? risk.score : null;
   const value = score == null ? "—" : `${score}%`;
   const dim = !loading && !risk.worth;
+  const fact = loading ? '<span class="skeleton-line"></span>' : !dim && risk.fact ? esc(risk.fact) : "";
   return `
     <button type="button" class="tile${dim ? " dim" : ""}${loading ? " loading" : ""}" data-family="${key}"
-      aria-pressed="${active === key}"${loading ? " disabled" : ""}>
-      <span class="tile-main">
-        <span class="tile-name"><span class="tile-dot" aria-hidden="true"></span>${NAMES[key]}</span>
-        <span class="tile-value">${value}</span>
-        <span class="tile-bars" aria-hidden="true">${bars(score)}</span>
-        <span class="tile-fact">${loading ? '<span class="skeleton-line"></span>' : esc(risk.fact || "")}</span>
-      </span>
-      <svg class="tile-icon" width="58" height="58" viewBox="0 0 24 24" fill="none" stroke-width="1.1"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[key]}</svg>
+      style="--grow:${grow(risk)}" aria-pressed="${active === key}"${loading ? " disabled" : ""}>
+      <span class="tile-name"><span class="tile-dot" aria-hidden="true"></span>${NAMES[key]}</span>
+      ${fact ? `<span class="tile-fact">${fact}</span>` : ""}
+      <span class="tile-foot"><span class="tile-value">${value}</span>${tileIcon(key)}</span>
     </button>`;
 }
 
@@ -209,15 +242,22 @@ function stepHtml(item, done) {
     ${done.has(item.id) ? "checked" : ""}><label for="${esc(id)}">${segmentsHtml(item.segments)}</label></li>`;
 }
 
-function stepsColumn(title, items, all, link, planKey) {
+function stepsColumn(title, items, all, link) {
   const done = checkedItems();
   return `
     <div class="col">
       <div class="col-head"><h2>${esc(title)}</h2>
         <span class="done-count">${doneCount(all)} of ${all.length} done</span></div>
       <ul class="steps">${items.map((i) => stepHtml(i, done)).join("")}</ul>
-      <button type="button" class="more" data-plan-open="${esc(planKey)}">${esc(link)}</button>
+      <a class="more" href="${esc(pageHref("shop"))}" data-nav>${esc(link)}</a>
     </div>`;
+}
+
+function factHtml(f) {
+  const icon = FACT_ICONS[f.icon || FAMILY_ICON[f.family]];
+  return `<li data-family="${esc(f.family || "")}">${icon ? `<svg class="fact-icon" width="22" height="22"
+    viewBox="0 0 24 24" fill="none" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"
+    aria-hidden="true">${icon}</svg>` : ""}<b>${esc(f.number)}</b><span>${esc(f.text)}</span></li>`;
 }
 
 function summaryHtml() {
@@ -226,12 +266,11 @@ function summaryHtml() {
   const left = `
     <div class="col">
       <h2>What has happened around this home</h2>
-      ${facts.length ? `<ul class="facts">${facts.map((f) =>
-        `<li><b>${esc(f.number)}</b><span>${esc(f.text)}</span></li>`).join("")}</ul>`
+      ${facts.length ? `<ul class="facts">${facts.map(factHtml).join("")}</ul>`
         : `<p class="muted">${esc(h.note || "No floods, wildfires or avalanches are on record near this address.")}</p>`}
     </div>`;
   const all = plans().flatMap(checkable);
-  return left + stepsColumn("Your action plan", summarySteps(), all, "See the full plan →", "emergency");
+  return left + stepsColumn("Your action plan", summarySteps(), all, "See the full plan →");
 }
 
 function storyHtml(risk) {
@@ -253,7 +292,7 @@ function riskStepsHtml(risk) {
   const first = all.slice(0, FIRST_STEPS);
   const rest = all.length - first.length;
   return stepsColumn("What to do first", first, all,
-    rest > 0 ? `See the other ${rest} step${rest > 1 ? "s" : ""} →` : "See the full plan →", plan.key);
+    rest > 0 ? `See the other ${rest} step${rest > 1 ? "s" : ""} →` : "See the full plan →");
 }
 
 function calmHtml() {
@@ -296,19 +335,7 @@ function select(key) {
 // 2050 view shows the change and its numbers instead of a score.
 function ahead(key) { return ((data && data.ahead && data.ahead.risks) || {})[key] || {}; }
 
-const shiftNumber = (v) => String(Math.abs(v) >= 10 ? Math.round(v) : Math.round(v * 10) / 10);
-
-function shiftHtml(bars) {
-  const top = Math.max(bars.from.value, bars.to.value) || 1;
-  const unit = bars.unit ? ` ${bars.unit}` : "";
-  const row = (p, cls) => `
-    <span class="shift-row${cls}"><span class="shift-label">${esc(p.label)}</span>
-      <span class="shift-track"><i style="width:${Math.max(4, Math.round((p.value / top) * 100))}%"></i></span>
-      <span class="shift-num">${esc(shiftNumber(p.value) + unit)}</span></span>`;
-  return `<span class="tile-shift">${row(bars.from, "")}${row(bars.to, " to")}</span>`;
-}
-
-function futureTileHtml(key) {
+function futureTileHtml(key, risk) {
   const f = ahead(key);
   const parts = /^([+−-]?\d+)\s*(.*)$/.exec(f.change || "");
   const value = !f.available ? "—"
@@ -316,15 +343,10 @@ function futureTileHtml(key) {
   const dim = !f.available || f.direction === "same";
   return `
     <button type="button" class="tile future${dim ? " dim" : ""}" data-family="${key}"
-      aria-pressed="${active === key}">
-      <span class="tile-main">
-        <span class="tile-name"><span class="tile-dot" aria-hidden="true"></span>${NAMES[key]}</span>
-        <span class="tile-value">${value}</span>
-        ${f.bars ? shiftHtml(f.bars) : ""}
-        <span class="tile-fact">${esc(f.fact || "")}</span>
-      </span>
-      <svg class="tile-icon" width="58" height="58" viewBox="0 0 24 24" fill="none" stroke-width="1.1"
-        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[key]}</svg>
+      style="--grow:${grow(risk)}" aria-pressed="${active === key}">
+      <span class="tile-name"><span class="tile-dot" aria-hidden="true"></span>${NAMES[key]}</span>
+      ${f.fact ? `<span class="tile-fact">${esc(f.fact)}</span>` : ""}
+      <span class="tile-foot"><span class="tile-value">${value}</span>${tileIcon(key)}</span>
     </button>`;
 }
 
@@ -333,13 +355,12 @@ function futureSummaryHtml() {
   const left = `
     <div class="col">
       <h2>What changes by 2050</h2>
-      ${items.length ? `<ul class="facts ahead-facts">${items.map((f) =>
-        `<li data-family="${esc(f.family)}"><b>${esc(f.number)}</b><span>${esc(f.text)}</span></li>`).join("")}</ul>`
+      ${items.length ? `<ul class="facts ahead-facts">${items.map(factHtml).join("")}</ul>`
         : `<p class="muted">The climate models project little change here by 2050.</p>`}
       <p class="ahead-fine">${esc(data.ahead.scenario)}</p>
     </div>`;
   const all = plans().flatMap(checkable);
-  return left + stepsColumn("Your action plan", summarySteps(), all, "See the full plan →", "emergency");
+  return left + stepsColumn("Your action plan", summarySteps(), all, "See the full plan →");
 }
 
 function futureStoryHtml(key) {
@@ -379,7 +400,7 @@ function renderFutureDetail() {
     <div class="col">
       <h2>What to do first</h2>
       <p class="muted">Today this risk scores low here, so your plan has no steps for it yet.</p>
-      <button type="button" class="more" data-plan-open="emergency">See the full plan →</button>
+      <a class="more" href="${esc(pageHref("shop"))}" data-nav>See the full plan →</a>
     </div>`);
   addMoney(el, risk);
 }
@@ -567,6 +588,158 @@ function onChecked(e) {
   if (again) again.focus();
 }
 
+// ------------------------------------------------------------------ what this home needs
+// The plan's shopping steps as a kit: one product for each thing to buy, taking turns
+// between the risks worth preparing for (worst first), with the emergency kit filling any
+// gap; the free steps that help most; and the service a partner offers for the worst risk.
+function queryString() {
+  return new URLSearchParams(Object.entries({
+    address: params.address, home: params.home, floor: params.floor, who: params.who.join(","),
+  }).filter(([, v]) => v !== "" && v != null)).toString();
+}
+
+function pageHref(target) { return `/${target === "shop" ? "shop" : "report"}?${queryString()}`; }
+
+function haveKey() { return `pai:have:${addressKey(params.address)}`; }
+function owned() { return new Set(store.get(haveKey(), [])); }
+
+function buySteps(plan) {
+  return plan.phases.filter((ph) => ph.key === "buy").flatMap((ph) => ph.items)
+    .filter((i) => (i.products || []).length);
+}
+
+function kitProducts() {
+  const all = plans();
+  const lists = all.filter((p) => p.key !== "emergency").map((p) => ({ family: p.key, items: buySteps(p) }));
+  const picks = [];
+  const add = (item, family) => {
+    const product = item.products[0];
+    if (picks.length < KIT_SIZE && !picks.some((p) => p.id === product.id)) picks.push({ ...product, family });
+  };
+  for (let round = 0; picks.length < KIT_SIZE && lists.some((l) => l.items[round]); round++) {
+    lists.forEach((l) => { if (l.items[round]) add(l.items[round], l.family); });
+  }
+  const emergency = all.find((p) => p.key === "emergency");
+  ((emergency && emergency.items) || []).filter((i) => (i.products || []).length)
+    .forEach((i) => add(i, "emergency"));
+  return picks;
+}
+
+function freeSteps() {
+  const all = plans();
+  const picks = all.filter((p) => p.key !== "emergency").map((p) => {
+    const before = p.phases.find((ph) => ph.key === "before");
+    return before && before.items[0];
+  }).filter(Boolean).slice(0, 2);
+  const emergency = all.find((p) => p.key === "emergency");
+  const spare = ((emergency && emergency.items) || []).filter((i) => !(i.products || []).length).reverse();
+  spare.forEach((i) => { if (picks.length < 3) picks.push(i); });
+  return picks.slice(0, 3);
+}
+
+function worthRisks() {
+  return ((data && data.risks) || []).filter((r) => r.worth).sort((a, b) => b.score - a.score);
+}
+
+function shopCardHtml(p, have) {
+  return `
+    <article class="pv-card prod" data-family="${esc(p.family)}">
+      <div class="prod-media">
+        <img src="${esc(p.image)}" alt="" loading="lazy" decoding="async" referrerpolicy="no-referrer">
+        <span class="prod-tag">${esc(TAGS[p.family] || "")}</span>
+      </div>
+      <div class="prod-body">
+        <h3>${esc(p.name)}</h3>
+        <p>${esc(p.what)}</p>
+      </div>
+      <div class="prod-price"><b>${EUROS.format(p.price)}</b><span>${esc(p.store)}</span></div>
+      <a class="prod-buy" href="${esc(p.url)}" target="_blank" rel="noopener${p.partner ? " sponsored" : ""}">View at the store ↗</a>
+      <button type="button" class="prod-have" data-have="${esc(p.id)}" aria-pressed="${have}">${have
+        ? "✓ You have this one" : "I already have it"}</button>
+    </article>`;
+}
+
+function serviceHtml() {
+  const worst = worthRisks()[0];
+  const service = worst && SERVICES[worst.key];
+  const partner = service && (((data.action_plan || {}).partners) || {})[service.partner];
+  if (!partner) return "";
+  return `
+    <div class="service-icon">${SHIELD_SVG}</div>
+    <div class="service-body">
+      <span class="service-title">${esc(service.title)}</span>
+      <span class="service-text">${esc(service.text)}</span>
+    </div>
+    <div class="service-side">
+      <div class="service-price"><b>Quote on request</b><span>${esc(partner.name)}</span></div>
+      <a class="prod-buy service-cta" href="${esc(partner.url)}" target="_blank" rel="noopener sponsored">Request a quote ↗</a>
+    </div>`;
+}
+
+function renderShop() {
+  if (!data) {
+    $("#shopTitle").textContent = "Looking at this home…";
+    $("#shopText").textContent = "";
+    $("#kitCount").textContent = "";
+    $("#kitTotal").textContent = "";
+    $("#freeList").innerHTML = "";
+    $("#shopGrid").innerHTML = "";
+    $("#shopService").hidden = true;
+    $("#shopNote").textContent = "";
+    return;
+  }
+  const have = owned();
+  const kit = kitProducts();
+  const missing = kit.filter((p) => !have.has(p.id));
+  const total = missing.reduce((sum, p) => sum + p.price, 0);
+  $("#shopTitle").textContent = missing.length
+    ? `${COUNT[missing.length]} this home is missing.` : "This home has everything on the list.";
+  const home = params.home === "apartment" ? "flat" : params.home === "house" ? "house" : "home";
+  const risks = worthRisks().map((r) => `${NAMES[r.key].toLowerCase()} at ${r.score}%`);
+  const chosen = risks.length
+    ? `Chosen for a ${home} with ${risks.length > 1 ? `${risks.slice(0, -1).join(", ")} and ${risks[risks.length - 1]}` : risks[0]}.`
+    : `Chosen for a ${home} where no risk stands out.`;
+  $("#shopText").textContent = `${chosen} We earn a commission if you buy through these links — you pay the same price.`;
+  $("#kitCount").textContent = `Your kit · ${missing.length} item${missing.length === 1 ? "" : "s"}`;
+  $("#kitTotal").textContent = EUROS_ROUND.format(total);
+  $("#freeList").innerHTML = freeSteps().map((i) =>
+    `<li>${TICK_SVG}<span>${segmentsHtml(i.segments)}</span></li>`).join("");
+  $("#shopGrid").innerHTML = kit.map((p) => shopCardHtml(p, have.has(p.id))).join("");
+  const service = serviceHtml();
+  $("#shopService").innerHTML = service;
+  $("#shopService").hidden = !service;
+  const seen = (data.action_plan || {}).prices_seen;
+  $("#shopNote").textContent = `${seen ? `Prices as seen on each store's page on ${niceDate(seen)}; they change. ` : ""}`
+    + "Store links are affiliate links: Previous AI earns a commission on purchases, and the price you pay is "
+    + "the same. We choose what fits your risk report, not what pays most.";
+}
+
+function toggleHave(id) {
+  const have = owned();
+  if (have.has(id)) have.delete(id); else have.add(id);
+  store.set(haveKey(), [...have]);
+  renderShop();
+  const again = $(`#shopGrid [data-have="${CSS.escape(id)}"]`);
+  if (again) again.focus();
+}
+
+function showPage(next) {
+  page = next === "shop" ? "shop" : "risks";
+  $("#report").dataset.page = page;
+  $("#risksPage").hidden = page !== "risks";
+  $("#shopPage").hidden = page !== "shop";
+  const back = $("#editLink");
+  if (page === "shop") {
+    back.textContent = "← Back to your risks";
+    back.setAttribute("href", pageHref("risks"));
+    renderShop();
+  } else {
+    back.textContent = "← Edit address";
+    back.setAttribute("href",
+      `/?${new URLSearchParams({ address: params.address, home: params.home || "house", floor: params.floor || "" })}`);
+  }
+}
+
 // ------------------------------------------------------------------ PDF
 let pdfBusy = false;
 
@@ -667,6 +840,7 @@ async function loadReport({ keep = false } = {}) {
     renderTiles();
     renderDetail();
     renderFooter();
+    renderShop();
     $("#horizon").hidden = !data.ahead;
     $("#pdfBtn").disabled = pdfBusy;
     const illustrated = (data.risks || []).filter((r) => r.illustration).sort((a, b) => b.score - a.score);
@@ -685,6 +859,8 @@ async function loadReport({ keep = false } = {}) {
     $("#horizon").hidden = true;
     $("#detail").dataset.view = "empty";
     $("#detail").innerHTML = "";
+    $("#shopTitle").textContent = "We could not analyse this address.";
+    $("#shopText").textContent = err.status === 404 ? err.message : "";
     if (!located) media.error("We could not find this address.");
   }
 }
@@ -787,6 +963,18 @@ export function initReport(appRef) {
 
   $("#pdfBtn").addEventListener("click", sharePdf);
 
+  $("#shopPage").addEventListener("click", (e) => {
+    const have = e.target.closest("[data-have]");
+    if (have) { toggleHave(have.dataset.have); return; }
+    const full = e.target.closest("[data-plan-open]");
+    if (full) openPlan(full.dataset.planOpen);
+  });
+  // A store photo that does not load leaves the tinted frame, not a broken image.
+  $("#shopGrid").addEventListener("error", (e) => {
+    const frame = e.target.closest && e.target.closest(".prod-media");
+    if (frame) frame.classList.add("broken");
+  }, true);
+
   $("#briefingBtn").addEventListener("click", () => {
     const loc = located || (data && data.location);
     if (!loc) return;
@@ -801,13 +989,20 @@ export function initReport(appRef) {
   });
 }
 
-export function showReport(search) {
-  params = {
+export function showReport(search, target = "risks") {
+  const next = {
     address: (search.get("address") || "").trim(),
     home: search.get("home") === "apartment" ? "apartment" : (search.get("home") === "house" ? "house" : ""),
     floor: search.get("floor") ?? "",
     who: (search.get("who") || "").split(",").filter((k) => PROFILES.some(([p]) => p === k)),
   };
+  // Moving between the two pages of the same report keeps what is loaded.
+  if (params && JSON.stringify(params) === JSON.stringify(next) && (data || token)) {
+    closePlan();
+    showPage(target);
+    return;
+  }
+  params = next;
   data = null;
   located = null;
   active = null;
@@ -827,6 +1022,7 @@ export function showReport(search) {
   $("#briefingBtn").hidden = !(h && h.fal && h.fal.ffmpeg);
   renderHeader();
   media.reset();
+  showPage(target);
   token++;
   loadReport();
   locate();

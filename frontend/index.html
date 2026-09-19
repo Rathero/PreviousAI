@@ -74,13 +74,14 @@
 </main>
 
 <!-- ============================================================ Risk report -->
-<main id="report" class="view view-report" data-active="" hidden>
+<main id="report" class="view view-report" data-active="" data-page="risks" hidden>
   <div class="rep-bg" aria-hidden="true">
     <div class="pv-bg pv-bg-a" data-bg="avalanche"></div>
     <div class="pv-bg pv-bg-b" data-bg="wildfire"></div>
     <div class="pv-bg pv-bg-a" data-bg="flood"></div>
     <div class="pv-bg pv-bg-b" data-bg="heat"></div>
     <div class="rep-shade"></div>
+    <div class="rep-dots"></div>
   </div>
 
   <header class="rep-header">
@@ -110,6 +111,8 @@
     </div>
   </header>
 
+  <!-- ------------------------------------------------ The risks -->
+  <div class="page" id="risksPage">
   <section class="rep-hero">
     <div class="hero-text" aria-live="polite">
       <h1 id="heroTitle"></h1>
@@ -124,12 +127,12 @@
         <span class="thumb-media" id="thumbMedia"></span>
         <span class="thumb-label" id="thumbLabel"></span>
       </button>
-      <div class="hero-actions">
-        <button type="button" class="ghost-btn" id="briefingBtn" hidden>
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"></path></svg>
+      <div class="media-actions">
+        <button type="button" class="photo-btn" id="briefingBtn" hidden>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"></path></svg>
           Video briefing</button>
-        <button type="button" class="ghost-btn" id="pdfBtn" disabled>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+        <button type="button" class="photo-btn" id="pdfBtn" disabled>
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
                stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
             <path d="M12 3v12M7 10l5 5 5-5M5 21h14"></path></svg>
           <span id="pdfLabel">PDF report</span></button>
@@ -142,6 +145,38 @@
   <section class="pv-card detail" id="detail" aria-live="polite"></section>
 
   <p class="rep-foot" id="repFoot"></p>
+  </div>
+
+  <!-- ------------------------------------------------ What this home needs -->
+  <div class="page" id="shopPage" hidden>
+  <section class="shop-hero">
+    <div class="shop-intro">
+      <h1 id="shopTitle"></h1>
+      <p id="shopText"></p>
+    </div>
+    <div class="pv-card kit">
+      <div class="kit-head">
+        <span class="kit-count" id="kitCount"></span>
+        <span class="kit-total" id="kitTotal"></span>
+      </div>
+      <button type="button" class="more" data-plan-open="emergency">See the full action plan →</button>
+    </div>
+  </section>
+
+  <section class="pv-card free" aria-labelledby="freeTitle">
+    <div class="free-head">
+      <span class="free-title" id="freeTitle">Free this weekend</span>
+      <span class="free-sub">Costs nothing, helps most</span>
+    </div>
+    <ul class="free-list" id="freeList"></ul>
+  </section>
+
+  <section class="shop-grid" id="shopGrid" aria-label="Products for this home"></section>
+
+  <section class="pv-card service" id="shopService" hidden></section>
+
+  <p class="shop-note" id="shopNote"></p>
+  </div>
 
   <!-- The home's pictures, large: street view, aerial view, AI illustration, video briefing -->
   <div class="overlay" id="viewer" hidden>
