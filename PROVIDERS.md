@@ -49,7 +49,7 @@ Free HTTP APIs over Copernicus and ECMWF data, called directly with `httpx`
 | Climate API | **CMIP6 HighResMIP** (EC-Earth3P-HR, MRI-AGCM3-2-S, MPI-ESM1-2-XR), 10 km | Change between 1995–2014 and 2036–2050 of hot days and RX1day (the delta of each model against itself, multi-model mean) |
 | Ensemble API | **ECMWF AIFS ENS** (51 members, default) or IFS ENS | The next 15 days: chance of 35 °C days, tropical nights and 20 mm days compared with the usual for those dates (`outlook.py`, never scored) |
 | Elevation API | **Copernicus DEM GLO-90** | 81 elevations around the point (16 rays up to 1 km) to find avalanche slopes of 28–55° |
-| Geocoding API | **GeoNames** towns | Town names ("Girona", "Vielha") when the text is not a street address |
+| Geocoding API | **GeoNames** towns | Town names ("El Masnou", "Vielha") when the text is not a street address |
 
 Open-Meteo limits by volume (per minute, hour and day): a new point costs about 1,800 of
 the 5,000 hourly calls. The code only requests variables it uses, keeps each point's
@@ -100,7 +100,9 @@ attribution to MITECO.
   it ("the mapped water would stay below your 4th floor"). No value never means "safe".
 - **CartoCiudad** geocoder (`providers/cartociudad.py`): Spanish addresses to the building
   entrance, with cadastral reference and postal code; its `candidates` endpoint feeds the
-  address suggestions while typing.
+  address suggestions while typing (only those in the town typed after a comma). Street
+  types come in Spanish; in Catalonia they are shown as on the street signs ("Carrer",
+  "Passeig", "Avinguda").
 - **PNOA orthophoto** and **IGN base map** WMTS (`mapping.py`): the aerial view of the
   home when Street View has no panorama, in Spain.
 

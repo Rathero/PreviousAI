@@ -102,7 +102,7 @@ Interactive documentation: http://localhost:8000/docs.
 
 ```bash
 # Warm the cache for a list of homes (mind Open-Meteo's hourly limit)
-.venv/Scripts/python.exe backend/scripts/prewarm.py --places "Carrer de la Força 5, Girona"
+.venv/Scripts/python.exe backend/scripts/prewarm.py --places "Carrer Sarriulera 10, Vielha"
 
 # Rebuild the Catalan layers (needs backend/requirements-batch.txt)
 .venv/Scripts/python.exe backend/scripts/catalonia_build.py

@@ -33,8 +33,7 @@ VIDEO_NEGATIVE = ("text, captions, subtitles, watermark, logo, morphing building
                   "distorted cars, blur, low quality, close-up faces")
 ILLUSTRATION_LIMITATION = (
     "An AI-generated illustration of a generic scene, not a picture of this place and not "
-    "a forecast. It only puts the value that chose it into human scale; the value itself, "
-    "its source and its method are in the card.")
+    "a forecast. It only puts the value that chose it into human scale.")
 
 # --------------------------------------------------------------------------- #
 # Flooding: one street, six water depths

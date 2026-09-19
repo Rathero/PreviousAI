@@ -7,7 +7,7 @@ Every warmed report also fetches its Street View metadata and, with Deepfire con
 today's fire-spread what-if.
 
     python backend/scripts/prewarm.py
-    python backend/scripts/prewarm.py --places "Carrer de la Força 5, Girona" "Vielha"
+    python backend/scripts/prewarm.py --places "Carrer Sarriulera 10, Vielha" "El Masnou"
     python backend/scripts/prewarm.py --gap 20 --no-spread
 """
 
@@ -27,15 +27,15 @@ from app import cache, dwelling  # noqa: E402
 from app.providers import streetview  # noqa: E402
 from app.report import build_report  # noqa: E402
 
-# Addresses that show the four hazards with official data behind them.
+# El Masnou (coast: floods, wildfires, heat) and Vielha (Pyrenees: floods, avalanches):
+# between them, the four hazards with official data behind them.
 EXAMPLES = [
     "El Masnou",
     "Passeig Prat de la Riba 10, El Masnou",
+    "Carrer de Navarra 10, El Masnou",
     "Vielha",
     "Carrer Sarriulera 10, Vielha",
     "Avinguda Castiero 17, Vielha",
-    "Carrer de la Força 5, Girona",
-    "Barcelona",
 ]
 
 

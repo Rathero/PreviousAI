@@ -85,9 +85,9 @@ async def locate(q: str = Query(min_length=2, max_length=300)):
     lat, lon = float(place["latitude"]), float(place["longitude"])
     code = (place.get("country_code") or "").upper()
     spain = code == "ES" if code else miteco.in_spain(lat, lon)
-    return {**{k: place.get(k) for k in ("name", "label", "town", "latitude", "longitude",
-                                         "precision", "geocoder", "ref_catastral", "country",
-                                         "address_not_found")},
+    return {**{k: place.get(k) for k in ("latitude", "longitude", "precision", "geocoder",
+                                         "ref_catastral", "country", "address_not_found")},
+            **view.place_lines(place), "label": view.street_name(place.get("label")),
             "aerial": mapping.AERIAL_PNOA if spain else mapping.AERIAL_S2}
 
 

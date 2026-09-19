@@ -371,7 +371,9 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 
 /* Cards --------------------------------------------------------------------- */
 .card {
-  background: var(--glass);
+  /* The glass of the design, with a faint tint so small text stays legible over the
+     light sand end of the background. */
+  background: linear-gradient(rgba(22, 28, 16, 0.16), rgba(22, 28, 16, 0.16)), var(--glass);
   backdrop-filter: blur(28px) saturate(160%);
   -webkit-backdrop-filter: blur(28px) saturate(160%);
   border: 1px solid var(--card-border);
@@ -618,6 +620,7 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .tab .count { font-size: 11px; color: var(--cream-50); font-variant-numeric: tabular-nums; }
 
 .plan { flex: 1; min-height: 0; display: flex; flex-direction: column; gap: 8px; }
+.plan, .history, .tabs, .rep-foot, .addr { text-shadow: 0 1px 2px rgba(10, 14, 6, 0.28); }
 .plan-note { margin: 0; font-size: 12.5px; line-height: 1.45; color: var(--cream-75); }
 .plan-note.household { color: var(--cream); }
 .phases {
@@ -673,13 +676,13 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 @media (max-width: 1100px) {
   .view-report { padding: 28px 28px; }
   .phases { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .rep-bottom { height: auto; grid-template-columns: 1fr; }
+  .rep-bottom { height: auto; grid-template-columns: minmax(0, 1fr); }
   .history { max-height: 260px; }
   .plan-card { min-height: 360px; }
   .phases .scroll { max-height: 220px; }
 }
 @media (max-width: 900px) {
-  .rep-main { grid-template-columns: 1fr; }
+  .rep-main { grid-template-columns: minmax(0, 1fr); flex: none; }
   .media { min-height: 260px; height: 56vw; max-height: 420px; flex: none; }
 }
 @media (max-width: 640px) {
@@ -701,6 +704,8 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   .emergency ul { columns: 1; }
   .tabs { justify-content: flex-start; }
   .popover { right: 0; }
+  .card-head-right .source { display: none; }
+  .view-report, .view-home { overflow-x: hidden; }
 }
 @media (prefers-reduced-motion: reduce) {
   .spinner, .mic[aria-pressed="true"], .risk.loading .bars i, .skeleton-line { animation: none; }

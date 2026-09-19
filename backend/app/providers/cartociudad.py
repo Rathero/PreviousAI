@@ -1,6 +1,6 @@
 """Spanish postal addresses · CartoCiudad (IGN and Cadastre). No key.
 
-It gives house-number precision: "Carrer de la Força 5, Girona" returns the exact
+It gives house-number precision: "Carrer Sarriulera 10, Vielha" returns the exact
 building entrance and its cadastral reference.
 
 Behaviours of the service this module handles:
@@ -10,6 +10,8 @@ Behaviours of the service this module handles:
     has to be requested (`find` with `type` and `id`): the middle vertex is used.
   - It can return another municipality without warning, so the municipality is
     required to appear in what was typed.
+  - Street types come in Spanish ("CALLE", "PASEO"); in Catalonia the streets are
+    named in Catalan ("Carrer", "Passeig"), so the type is shown that way there.
 """
 
 from __future__ import annotations
@@ -27,6 +29,14 @@ SUGGEST_TTL_S = 7 * 24 * 3600
 
 _SMALL_WORDS = {"de", "del", "dels", "la", "les", "el", "els", "i", "y", "d", "l"}
 
+CATALAN_TYPES = {
+    "CALLE": "Carrer", "AVENIDA": "Avinguda", "PASEO": "Passeig", "PLAZA": "Plaça",
+    "CAMINO": "Camí", "CARRETERA": "Carretera", "PASAJE": "Passatge", "TRAVESIA": "Travessia",
+    "RONDA": "Ronda", "RAMBLA": "Rambla", "CALLEJON": "Carreró", "URBANIZACION": "Urbanització",
+    "BARRIO": "Barri", "BAJADA": "Baixada", "SUBIDA": "Pujada", "PARQUE": "Parc",
+    "MUELLE": "Moll", "PLAZUELA": "Placeta", "POLIGONO": "Polígon", "GRAN VIA": "Gran Via",
+}
+
 
 def norm(text: str | None) -> str:
     t = "".join(c for c in unicodedata.normalize("NFKD", text or "")
@@ -42,15 +52,24 @@ def tidy(text: str | None) -> str:
     for i, word in enumerate(text.strip().lower().split()):
         parts = re.split(r"(['’])", word)
         out = []
+        after_number = i > 0 and words[-1].isdigit()  # "8 I" is door 8 I, not "8 and"
         for part in parts:
             if part in ("'", "’") or not part:
                 out.append(part)
-            elif i > 0 and part in _SMALL_WORDS:
+            elif i > 0 and part in _SMALL_WORDS and not after_number:
                 out.append(part)
             else:
                 out.append(part[:1].upper() + part[1:])
         words.append("".join(out))
     return " ".join(words)
+
+
+def street_type(hit: dict) -> str:
+    """The street type as the street signs show it: Catalan in Catalonia."""
+    kind = (hit.get("tip_via") or "").strip()
+    if "catalunya" in norm(hit.get("comunidadAutonoma")):
+        return CATALAN_TYPES.get(norm(kind).upper(), tidy(kind))
+    return tidy(kind)
 
 
 def municipality_matches(hit: dict, query: str) -> bool:
@@ -71,8 +90,7 @@ def midpoint_of_wkt(wkt: str | None) -> tuple[float, float] | None:
 
 
 def to_place(hit: dict, lat: float, lon: float, precision: str) -> dict:
-    via = (hit.get("tip_via") or "").title()
-    street = " ".join(x for x in (via, (hit.get("address") or "").title(),
+    street = " ".join(x for x in (street_type(hit), tidy(hit.get("address")),
                                   str(hit["portalNumber"]) if hit.get("portalNumber") else "") if x)
     town = hit.get("poblacion") or hit.get("muni")
     return {
@@ -123,7 +141,16 @@ def _suggestion(c: dict) -> dict | None:
     raw = (c.get("address") or "").strip()
     if not raw:
         return None
-    street = raw.split(",")[0].strip()
+    # "CALLE MAJOR;AG.AUBERT", "CALLE SARRIULERA AG.ARROS": the "AG." part is an internal
+    # alias for the village the street belongs to.
+    street = re.split(r";|\s+AG\.", raw.split(",")[0], flags=re.I)[0].strip()
+    via = (c.get("tip_via") or "").strip()
+    if via and street.upper().startswith(via.upper() + " "):
+        street = f"{street_type(c)} {street[len(via) + 1:]}"
+    ext = str(c.get("extension") or "").strip()
+    if ext.isdigit() and street.endswith(f" {ext}"):
+        # A numeric sub-entrance ("24 1") that the geocoder reads as another number.
+        street = street[: -len(ext) - 1]
     town = c.get("poblacion") or c.get("muni") or ""
     kind = c.get("type")
     if kind == "portal":
@@ -138,24 +165,38 @@ def _suggestion(c: dict) -> dict | None:
     line2 = ", ".join(x for x in (c.get("postalCode"), town if street else None, c.get("province"))
                       if x and x != line1)
     text = f"{line1}, {town}" if street and town else line1
-    return {"text": text, "line1": line1, "line2": line2, "precision": precision}
+    return {"text": text, "line1": line1, "line2": line2, "precision": precision,
+            "places": [norm(c.get(k)) for k in ("poblacion", "muni") if c.get(k)]}
+
+
+def _in_town(suggestion: dict, towns: list[str]) -> bool:
+    return any(t in name or name in t for t in towns for name in suggestion["places"])
 
 
 async def candidates(query: str, limit: int = 6) -> list[dict]:
-    """Address suggestions for the address box (Spain)."""
-    key = f"candidates:{norm(query)}:{limit}"
+    """Address suggestions for the address box (Spain).
+
+    The service matches words anywhere, so "Avinguda Castiero 1, Vielha" also brings
+    streets from other regions: when the text names a town after a comma, only the
+    suggestions in that town are kept.
+    """
+    key = f"candidates:v4:{norm(query)}:{limit}"
     hit = cache.get("cartociudad", key, ttl=SUGGEST_TTL_S)
     if hit is not None:
         return hit
     async with httpx.AsyncClient(timeout=8, headers={"User-Agent": config.USER_AGENT}) as client:
-        resp = await client.get(CANDIDATES_URL, params={"q": query, "limit": limit})
+        resp = await client.get(CANDIDATES_URL, params={"q": query, "limit": max(limit, 12)})
         resp.raise_for_status()
         data = resp.json() if resp.text.strip() else []
-    out, seen = [], set()
+    found, seen = [], set()
     for c in data if isinstance(data, list) else []:
         s = _suggestion(c)
         if s and s["text"].lower() not in seen:
             seen.add(s["text"].lower())
-            out.append(s)
+            found.append(s)
+    towns = [t for t in (norm(part) for part in query.split(",")[1:]) if len(t) >= 3 and not t.isdigit()]
+    if towns:
+        found = [s for s in found if _in_town(s, towns)]
+    out = [{k: v for k, v in s.items() if k != "places"} for s in found][:limit]
     cache.set("cartociudad", key, out)
-    return out[:limit]
+    return out

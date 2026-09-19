@@ -13,11 +13,38 @@ TILES = [("wildfire", "Wildfires"), ("flood", "Floods"), ("avalanche", "Avalanch
          ("heat", "Heat waves")]
 
 
+_PARTICLES = {"de", "del", "dels", "la", "las", "los", "les", "el", "els", "i", "y", "d", "l"}
+
+
+def street_name(text: str | None) -> str | None:
+    """Joining words in lower case inside each part of an address, and each part opening
+    with a capital: "Passeig Prat De La Riba 10, el Masnou" -> "Passeig Prat de la Riba 10,
+    El Masnou" (some saved addresses were title-cased word by word)."""
+    if not text:
+        return text
+    parts = []
+    for part in text.split(","):
+        lead, words = part[: len(part) - len(part.lstrip())], part.strip().split(" ")
+        name = " ".join(w.lower() if i and w.lower() in _PARTICLES else w for i, w in enumerate(words))
+        parts.append(lead + name[:1].upper() + name[1:])
+    return ",".join(parts)
+
+
 def _town(loc: dict) -> str | None:
     if loc.get("town"):
         return loc["town"]
     parts = [p.strip() for p in str(loc.get("label") or "").split(",") if p.strip()]
     return parts[1] if len(parts) > 1 else None
+
+
+def place_lines(loc: dict) -> dict:
+    """The two lines of the address header: the street (or the town) and where it is.
+    A town on its own is followed by its region, not by its own name again."""
+    name = street_name(loc.get("name"))
+    town = street_name(_town(loc))
+    if not town or (name and town.lower() == name.lower()):
+        town = loc.get("admin1") or loc.get("country")
+    return {"name": name, "town": town}
 
 
 def _source(card: dict) -> str | None:
@@ -67,12 +94,17 @@ def _tile(report: dict, key: str, label: str, family: dict | None) -> dict:
     }
 
 
+def risks(report: dict) -> list[dict]:
+    """The four risk tiles, in the app's order."""
+    families = {f["key"]: f for f in (report.get("protection") or {}).get("families", [])}
+    return [_tile(report, key, label, families.get(key)) for key, label in TILES]
+
+
 def app_view(report: dict) -> dict:
     loc = report["location"]
-    families = {f["key"]: f for f in (report.get("protection") or {}).get("families", [])}
     return {
         "location": {
-            "label": loc.get("label"), "name": loc.get("name"), "town": _town(loc),
+            "label": street_name(loc.get("label")), **place_lines(loc),
             "latitude": loc["latitude"], "longitude": loc["longitude"],
             "precision": loc.get("precision"), "geocoder": loc.get("geocoder"),
             "ref_catastral": loc.get("ref_catastral"), "country": loc.get("country"),
@@ -81,7 +113,7 @@ def app_view(report: dict) -> dict:
         },
         "dwelling": report.get("dwelling"),
         "overall": report.get("overall"),
-        "risks": [_tile(report, key, label, families.get(key)) for key, label in TILES],
+        "risks": risks(report),
         "history": report.get("history"),
         "action_plan": report.get("action_plan"),
         "aerial": (report.get("map") or {}).get("aerial"),

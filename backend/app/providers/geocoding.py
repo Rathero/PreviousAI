@@ -20,7 +20,7 @@ from .. import cache, config
 from . import cartociudad, nominatim
 
 GEOCODE_URL = "https://geocoding-api.open-meteo.com/v1/search"
-RESOLVE_KEY = "resolve:v3"
+RESOLVE_KEY = "resolve:v4"
 
 
 class GeocodingError(RuntimeError):
