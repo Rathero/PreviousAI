@@ -35,4 +35,21 @@ export const api = {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
   }),
   briefingStatus: (id) => request(`/api/briefing/${encodeURIComponent(id)}`),
+  // The PDF comes back as a file, not JSON: the raw response, or a readable error.
+  reportPdf: async (params) => {
+    let resp;
+    try {
+      resp = await fetch(`/api/report/pdf?${qs(params)}`);
+    } catch (_) {
+      throw new Error("The server is not responding. Check your connection and try again.");
+    }
+    if (!resp.ok) {
+      let detail = null;
+      try { detail = (await resp.json()).detail; } catch (_) { detail = null; }
+      const error = new Error(typeof detail === "string" ? detail : `The server answered ${resp.status}.`);
+      error.status = resp.status;
+      throw error;
+    }
+    return resp;
+  },
 };

@@ -103,7 +103,8 @@ attribution to MITECO.
   address suggestions while typing (only those in the town typed after a comma). Street
   types come in Spanish; in Catalonia they are shown as on the street signs ("Carrer",
   "Passeig", "Avinguda").
-- **PNOA orthophoto** and **IGN base map** WMTS (`mapping.py`): the aerial view of the
+- **PNOA orthophoto** and **IGN base map** WMTS (`mapping.py`; the PDF report stitches its
+  aerial picture from the same tiles, credited): the aerial view of the
   home when Street View has no panorama, in Spain.
 
 Licence: CC BY 4.0 (IGN).
@@ -268,8 +269,9 @@ Street View Static API (`providers/streetview.py`, `/api/streetview`). The free 
 call finds the nearest outdoor panorama within 60 m and its date; the image is requested
 from that panorama turned towards the address, proxied by the backend so the key never
 reaches the browser, and never stored (only the panorama id, position and date are
-cached). Needs `GOOGLE_MAPS_API_KEY` with the Street View Static API enabled. Without a key
-or a panorama, the card shows the aerial view.
+cached). The PDF report embeds the same image, credited "© Google", drawn on request and
+not kept on the server. Needs `GOOGLE_MAPS_API_KEY` with the Street View Static API
+enabled. Without a key or a panorama, the app shows the aerial view.
 
 ### EOX Sentinel-2 cloudless
 
@@ -307,6 +309,14 @@ Occidente**, **Mapfre**, **Xiaomi**, **Applus+**, **Bureau Veritas**, **Cortizo*
 **Ortovox**, **Mitsubishi Electric** and **ISOVER (Saint-Gobain)**, plus the **My112** app
 of the Spanish emergency services. Partners never change a score or which plans appear:
 the plans shown are those of the risks present at the address, worst first.
+
+Each thing to buy also carries one or two real products (`backend/app/products.py`): the
+direct link to the product page, the store's own photo (loaded from the store's image
+server without a referrer) and the price that page showed on the day it was checked,
+which the plan states. The stores are **Leroy Merlin**, **Xiaomi**, **Shelly**,
+**Bauhaus**, **Decathlon** and **Midland**; no key is needed. Links and prices change:
+check them again, and update `CHECKED`, before relying on them. Products never decide
+which steps appear.
 
 The wider measure catalogue with costs, standards and official programmes (MITECO grants,
 Consorcio de Compensación de Seguros, ICGC and AEMET bulletins, climate shelters...) is

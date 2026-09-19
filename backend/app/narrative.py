@@ -155,6 +155,7 @@ PROFILE_ADVICE = [
 PROJECTION_METRIC_EN = {
     "hot_days_35": "days above 35 °C",
     "hot_days_32": "days above 32 °C",
+    "tropical_nights": "tropical nights",
     "rx1day": "rain on the wettest day",
 }
 

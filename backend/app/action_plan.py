@@ -4,11 +4,15 @@ The content is hand-written and fixed. What the report decides is only which haz
 plans appear and in which order: the families that apply at this address, worst first.
 Each hazard plan has four phases (before, buy or arrange, during, after). Partner names
 in "Buy or arrange" are links; partners never change a score or which plans appear.
+A step to buy something can carry real products (`products.py`): a photo, the price and
+a direct link to the store's page.
 """
 
 from __future__ import annotations
 
 import re
+
+from . import products as P
 
 # Hazard plans appear for families at or above this score, and always the worst one.
 MIN_SCORE = 20
@@ -37,7 +41,8 @@ EMERGENCY_PLAN = {
         "Install My112: [Android](https://play.google.com/store/apps/details?id=com.telefonica.my112) · "
         "[iPhone](https://apps.apple.com/es/app/my112/id804779618)",
         "Pack an emergency bag.",
-        "Store water, medicines, torch, radio and power bank.",
+        ("Store water, medicines, torch, radio and power bank.",
+         ["midland_er300_pro", "xiaomi_power_bank"]),
         "Waterproof IDs and insurance documents.",
         "Plan a stair-only exit.",
         "Include children, older or disabled people, and pets.",
@@ -46,7 +51,8 @@ EMERGENCY_PLAN = {
     ],
 }
 
-# Partners are written {like_this} and become links; other brands stay plain text.
+# Partners are written {like_this} and become links; other brands stay plain text. A step
+# is its text, or (text, [product ids]) when it proposes products to buy.
 PLANS = {
     "flood": {
         "label": "Floods",
@@ -58,12 +64,14 @@ PLANS = {
                 "Move your car out of underground parking when warned.",
             ]),
             ("buy", "Buy or arrange", [
-                "Water alarms for low areas — available at {leroy_merlin}, or as a 24/7 "
-                "monitored sensor from {verisure}.",
-                "Raised storage shelves — available at {leroy_merlin}.",
-                "Removable flood barriers — available at {leroy_merlin}, with installation service.",
-                "Professional installation of a non-return valve or sump pump — {leroy_merlin} "
-                "installation service.",
+                ("Water alarms for low areas, or a 24/7 monitored sensor from {verisure}.",
+                 ["shelly_flood_gen4", "garza_leak_alarm"]),
+                ("Raised storage shelves.", ["spaceo_shelving"]),
+                ("Removable flood barriers for doors and the garage, and water-activated sacks "
+                 "for the gaps.", ["mbm_flood_barrier", "hydrosnake_sacks"]),
+                ("A sump pump with a float switch, and a non-return valve on the drains — fitted "
+                 "by the {leroy_merlin} installation service.",
+                 ["gardena_20000_pump", "karmat_backwater_valve"]),
                 "Check whether your home insurance already covers flood damage, or get a quote — "
                 "{catalana_occidente} or {mapfre}.",
             ]),
@@ -95,11 +103,16 @@ PLANS = {
                 "Remove flammable items from balconies and terraces.",
             ]),
             ("buy", "Buy or arrange", [
-                "Smoke alarms — available at {leroy_merlin}, or as a monitored alarm from {verisure}.",
-                "Fire extinguisher and fire blanket — available at {leroy_merlin}.",
-                "HEPA air purifier — {xiaomi} or Philips, available at Leroy Merlin or El Corte Inglés.",
-                "FFP2 masks.",
-                "Long garden hose — available at {leroy_merlin}.",
+                ("Smoke alarms, or a monitored alarm from {verisure}.",
+                 ["xsense_wifi_smoke", "garza_smoke_pack"]),
+                ("Fire extinguisher and fire blanket.",
+                 ["ferretelix_extinguisher", "securikit_fire_blanket"]),
+                ("HEPA air purifier for a room you can close — {xiaomi} or Equation.",
+                 ["xiaomi_purifier_4_compact", "equation_air_corner"]),
+                ("FFP2 masks.", ["3m_ffp2_masks"]),
+                ("Long garden hose.", ["geolia_hose_30m"]),
+                ("Metal mesh over vents, eaves and gutters, so embers cannot get in.",
+                 ["saturnia_ember_mesh"]),
                 "Professional vegetation and roof inspection — {applus} or {bureau_veritas} "
                 "technical inspection service.",
             ]),
@@ -139,8 +152,8 @@ PLANS = {
                 "inspection service.",
                 "Reinforcement recommended by a qualified engineer — follow-up work certified by "
                 "{applus} or {bureau_veritas}.",
-                "For mountain activities: transceiver, probe, shovel and training — {ortovox} "
-                "equipment, available at Decathlon or Barrabés.",
+                ("For mountain activities: a transceiver, probe and shovel for each person, and "
+                 "training to use them — or an {ortovox} kit.", ["arva_evo4_pack"]),
             ]),
             ("during", "During an avalanche alert", [
                 "Follow official instructions.",
@@ -170,13 +183,13 @@ PLANS = {
                 "Arrange daily checks for vulnerable people.",
             ]),
             ("buy", "Buy or arrange", [
-                "Indoor thermometer — available at {leroy_merlin}.",
-                "External blinds or awnings — available at {leroy_merlin}.",
-                "Fan — available at {leroy_merlin}.",
-                "Air conditioner or heat pump — {mitsubishi_electric} or Daikin units, installed "
-                "via {leroy_merlin} or a local installer.",
-                "Roof or attic insulation — {isover} materials, installed via {leroy_merlin} or a "
-                "local installer.",
+                ("Indoor thermometer.", ["xiaomi_th_monitor_2"]),
+                ("External blinds or awnings.", ["naterial_calima_awning"]),
+                ("Fan.", ["arte_confort_cacela_fan"]),
+                ("Air conditioner or heat pump — {mitsubishi_electric} or Daikin units, installed "
+                 "via {leroy_merlin} or a local installer.", ["mitsubishi_msz_ay35"]),
+                ("Roof or attic insulation — {isover} materials, installed via {leroy_merlin} or a "
+                 "local installer.", ["isover_ibr80"]),
             ]),
             ("during", "During extreme heat", [
                 "Close blinds before direct sunlight enters.",
@@ -219,9 +232,20 @@ def segments(text: str) -> list[dict]:
     return out
 
 
-def _item(plan: str, phase: str, n: int, text: str) -> dict:
-    return {"id": f"{plan}.{phase}.{n}", "segments": segments(text),
-            "partners": sorted({s["partner"] for s in segments(text) if s.get("partner")})}
+def _product(pid: str) -> dict:
+    """A product as the plan shows it; `partner` when the store is one of the partners."""
+    p = P.PRODUCTS[pid]
+    return {"id": pid, "name": p["name"], "what": p["what"], "price": p["price"],
+            "store": P.STORES[p["store"]], "url": p["url"], "image": p["image"],
+            "partner": p["store"] if p["store"] in PARTNERS else None}
+
+
+def _item(plan: str, phase: str, n: int, step: str | tuple[str, list[str]]) -> dict:
+    text, products = (step, []) if isinstance(step, str) else step
+    segs = segments(text)
+    return {"id": f"{plan}.{phase}.{n}", "segments": segs,
+            "partners": sorted({s["partner"] for s in segs if s.get("partner")}),
+            "products": [_product(pid) for pid in products]}
 
 
 def _emergency() -> dict:
@@ -262,6 +286,7 @@ def build(report: dict) -> dict:
         "household": household,
         "household_by": (report.get("personalization") or {}).get("by"),
         "partners": PARTNERS,
+        "prices_seen": P.CHECKED,
         "note": ("Plans appear for the hazards present at this address, worst first. Partners "
-                 "never change a score or which plans appear."),
+                 "and products never change a score or which plans appear."),
     }

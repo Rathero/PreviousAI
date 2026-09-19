@@ -6,6 +6,20 @@
       "runtimeExecutable": ".venv/Scripts/python.exe",
       "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--app-dir", "backend", "--port", "8000"],
       "port": 8000
+    },
+    {
+      "name": "previous-ai-dev",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--app-dir", "backend", "--port", "8001",
+                      "--reload", "--reload-dir", "backend"],
+      "port": 8001
+    },
+    {
+      "name": "previous-ai-8002",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "app.main:app", "--app-dir", "backend", "--port", "8002",
+                      "--reload", "--reload-dir", "backend"],
+      "port": 8002
     }
   ]
 }

@@ -17,9 +17,13 @@ score.
   this home (a 4th-floor flat is not a ground floor) and its first steps; the picture
   becomes an AI illustration of what that risk could look like.
 - **Action plan**: a basic emergency plan and, for each risk worth preparing for, what to
-  do before, what to buy or arrange (with partners), what to do during and after. Tick
-  items off as you go; tell us who lives there and the plan puts first what matters for
-  them.
+  do before, what to buy or arrange (with partners), what to do during and after. What to
+  buy comes with real products: the store's photo, the price and a direct link to buy it.
+  Tick items off as you go; tell us who lives there and the plan puts first what matters
+  for them.
+- **PDF report** to keep and share: the pictures of the home, every value behind each
+  score with its period and source, what already happened, the climate to 2050, the full
+  action plan with its partners and the sources. On a phone it opens the share sheet.
 
 The app is public: no sign-up and no login.
 
@@ -51,10 +55,12 @@ backend/app/         FastAPI API and the report engine
   indicators.py      The provenance contract
   history.py         What already happened near the home
   action_plan.py     The action plan and its partners
+  products.py        The real products the plan proposes: store, link, photo, price
   dwelling.py        House or flat, and the floor: who acts, what the water means
   protection.py      The measure catalogue (costs, standards, official programmes)
   media.py           The fal.ai illustration library, picked by each card's value
   briefing.py        The narrated video briefing (script written by code)
+  pdf_report.py      The report as a PDF (ReportLab), with the pictures of the home
   view.py            The report as the web app shows it (headline, facts, stories)
   providers/         One module per external service
 backend/scripts/     Batch pipelines: cache warm-up, Catalan layers, Copernicus CDS,
@@ -81,6 +87,7 @@ hazard belongs to the place.
 | Endpoint | Purpose |
 |---|---|
 | `GET /api/report?address=&home=house\|apartment&floor=&who=` | The web app's report |
+| `GET /api/report/pdf?address=&home=&floor=&who=` | The same report as a PDF, drawn on request |
 | `GET /api/risk?q=` (or `ask=`, or `lat=&lon=`) | The full report, every indicator and its provenance, map layers, forecast |
 | `GET /api/suggest?q=` | Address suggestions while typing (Spain) |
 | `GET /api/locate?q=` | The point an address resolves to |

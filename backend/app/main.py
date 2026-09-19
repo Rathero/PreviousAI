@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from . import (autonomy_store, briefing, cache, claims, config, dwelling as DW, interpret, mapping,
-               media, protection, report as R, scoring, video, view)
+               media, pdf_report, protection, report as R, scoring, video, view)
 from .providers import ai, cds, cds_baseline, fal, geocoding, miteco, open_meteo, streetview
 
 FRONTEND_DIR = config.ROOT / "frontend"
@@ -128,14 +128,37 @@ async def home_report(
                                               + ", ".join(interpret.PROFILES)),
 ):
     """The web app's report for a home: four risks, the history and the action plan."""
+    return view.app_view(await _home_report(address, home, floor, who))
+
+
+async def _home_report(address: str, home: str | None, floor: str | None, who: str | None) -> dict:
     try:
-        rep = await R.build_report(query=address, profile=_profile(who), force_home=True,
-                                   dwelling=DW.parse(home, floor))
+        return await R.build_report(query=address, profile=_profile(who), force_home=True,
+                                    dwelling=DW.parse(home, floor))
     except geocoding.GeocodingError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except (RuntimeError, ValueError) as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
-    return view.app_view(rep)
+
+
+@app.get("/api/report/pdf")
+async def home_report_pdf(
+    address: str = Query(min_length=2, max_length=300, description="The home's address"),
+    home: str | None = Query(None, description="house | apartment"),
+    floor: str | None = Query(None, description="Floor of the flat (0 = ground floor)"),
+    who: str | None = Query(None, description="Who lives there, comma-separated"),
+):
+    """The same report as a PDF to keep and share: every value behind each score, what
+    already happened, the climate to 2050, the full action plan and the sources, with the
+    pictures of the home. Drawn on request, never stored."""
+    rep = await _home_report(address, home, floor, who)
+    app_view = view.app_view(rep)
+    pictures = await pdf_report.pictures(rep)
+    pdf = await asyncio.to_thread(pdf_report.render, rep, app_view, pictures)
+    return Response(pdf, media_type="application/pdf", headers={
+        "Content-Disposition": f'attachment; filename="{pdf_report.filename(app_view)}"',
+        "Cache-Control": "no-store",
+    })
 
 
 @app.get("/api/interpret")

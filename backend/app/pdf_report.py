@@ -65,6 +65,7 @@ CHECKABLE = {"before", "buy", "first"}
 LEVELS = [("Very low", "0-19"), ("Low", "20-39"), ("Moderate", "40-59"), ("High", "60-79"),
           ("Very high", "80-100")]
 PROJECTION_LABELS = {"hot_days_35": "Days a year above 35 °C", "hot_days_32": "Days a year above 32 °C",
+                     "tropical_nights": "Tropical nights a year (never below 20 °C)",
                      "rx1day": "Rain on the wettest day of a typical year"}
 PRECISION = {"address": "at the building entrance of the address", "street": "in the middle of the street",
              "town": "at the centre of the town", "place": "at the centre of the place",
@@ -111,25 +112,32 @@ def nice_date(value) -> str:
     return f"{int(m.group(3))} {month} {m.group(1)}" if m.group(3) else f"{month} {m.group(1)}"
 
 
+def dates(text) -> str:
+    """ISO dates inside a text as people write them: "1982-11-05" -> "5 Nov 1982"."""
+    return re.sub(r"\b\d{4}-\d{2}-\d{2}\b", lambda m: nice_date(m.group(0)), str(text or ""))
+
+
 def public_source(text) -> str:
     """A source as the report names it: the data, not the service that delivered them."""
     s = str(text or "")
     if "deepfire" in s.lower():
         return "Satellite hotspots (VIIRS, MODIS)"
-    return re.sub(r",?\s+via\s+.*$", "", s)
+    return re.sub(r",?\s+(via|read from)\s+.*$", "", s)
 
 
 def shown(ind: dict) -> str:
     """An indicator's value as the report states it, never re-rounded into a new number."""
     display = (ind.get("extras") or {}).get("display")
     if display not in (None, ""):
-        return str(display)
+        return dates(display)
     value, unit = ind.get("value"), (ind.get("unit") or "").strip()
     if value is None:
         return "-"
     if isinstance(value, (int, float)):
         digits = 3 if abs(value) < 1 else 2 if abs(value) < 10 else 1 if abs(value) < 100 else 0
         text = f"{value:,.{digits}f}".rstrip("0").rstrip(".") if digits else f"{value:,.0f}"
+        if value == 1 and unit.endswith("s") and "/" not in unit:
+            unit = unit[:-1]   # "1 episode", not "1 episodes"
         return f"{text or '0'} {unit}".strip()
     return f"{value} {unit}".strip()
 
@@ -141,6 +149,13 @@ def segments(items: list[dict] | None) -> str:
         text = plain(s.get("text"))
         out.append(f'<a href="{_href(s["url"])}" color="{LINK}"><u>{text}</u></a>' if s.get("url") else text)
     return "".join(out)
+
+
+def products(items: list[dict] | None) -> str:
+    """The products proposed for a step, one per line: the name links to the store's page."""
+    return "".join(f'<br/><font size="8" color="#5B6655"><a href="{_href(p["url"])}" color="{LINK}">'
+                   f'<u>{plain(p["name"])}</u></a> · €{p["price"]:,.2f} at {plain(p["store"])}</font>'
+                   for p in items or [])
 
 
 def _tint(hex_color: str, amount: float) -> colors.Color:
@@ -460,7 +475,7 @@ def _cover(app: dict, pics: dict, st: dict, display: str) -> list:
 
 def _story(risk: dict, st: dict, width: float) -> list:
     rows = [[Paragraph(plain(nice_date(r["when"])), st["cellm"]), Paragraph(plain(r["text"]), st["body"])]
-            for r in risk.get("story") or []]
+            for r in risk.get("story") or [] if r["text"] != risk.get("fact")]
     if not rows:
         return []
     t = Table(rows, colWidths=[24 * mm, width - 24 * mm])
@@ -471,18 +486,18 @@ def _story(risk: dict, st: dict, width: float) -> list:
     return [Paragraph(plain(risk["story_title"]), st["h3"]), t]
 
 
-def _card(card: dict, st: dict) -> list:
+def _card(card: dict, st: dict, heading: str | None = None) -> list:
     rows = [[Paragraph("INDICATOR", st["cellh"]), Paragraph("VALUE", st["cellh"]),
              Paragraph("PERIOD", st["cellh"]), Paragraph("SOURCE", st["cellh"])]]
     for ind in card.get("indicators") or []:
         prov = ind.get("provenance") or {}
         label = plain(ind.get("label"))
         if ind.get("context"):
-            label += f'<br/><font size="7" color="#5B6655">{plain(ind["context"])}</font>'
+            label += f'<br/><font size="7" color="#5B6655">{plain(dates(ind["context"]))}</font>'
         rows.append([Paragraph(label, st["cell"]), Paragraph(plain(shown(ind)), st["cell"]),
                      Paragraph(plain(prov.get("period")), st["cellm"]),
                      Paragraph(plain(public_source(prov.get("source"))), st["cellm"])])
-    out = [CondPageBreak(40 * mm),
+    out = [CondPageBreak(45 * mm)] + ([Paragraph(heading, st["h3"])] if heading else []) + [
            Paragraph(f"<b>{plain(card['label'])}</b> · {round(card['score'])}% · {plain(card['level'])}",
                      st["body"]),
            Paragraph(plain(card.get("headline")), st["muted"]), Spacer(1, 2 * mm),
@@ -501,13 +516,15 @@ def _risk(report: dict, risk: dict, st: dict, display: str) -> list:
     if not risk.get("worth"):
         out.append(Paragraph("Nothing to prepare for here: this address scores at the bottom of the scale for "
                              "this hazard, so the action plan has no steps for it.", st["muted"]))
+    out.append(Spacer(1, 1.5 * mm))
     poster = _illustration_file(risk.get("illustration"))
     pic_w = 70 * mm
     left_w = WIDTH - pic_w - 6 * mm if poster else WIDTH
     left = _story(risk, st, left_w)
-    if risk.get("home_note"):
+    note = risk.get("home_note")
+    if note and not any(r["text"] == note for r in risk.get("story") or []):
         left += [Spacer(1, 2 * mm), _box([Paragraph("FOR YOUR HOME", st["label"]),
-                                          Paragraph(plain(risk["home_note"]), st["body"])], width=left_w)]
+                                          Paragraph(plain(note), st["body"])], width=left_w)]
     if poster:
         ill = risk["illustration"]
         right = [Spacer(1, 3 * mm), PdfImage(str(poster), width=pic_w, height=pic_w * 536 / 960),
@@ -520,11 +537,9 @@ def _risk(report: dict, risk: dict, st: dict, display: str) -> list:
     cards = sorted((h for h in report.get("hazards", [])
                     if h["key"] in protection.FAMILIES[key]["cards"] and h.get("score") is not None),
                    key=lambda h: -h["score"])
-    if cards:
-        out.append(Paragraph("How the score is built", st["h3"]))
-        for card in cards:
-            out += _card(card, st)
-    elif risk.get("summary"):
+    for i, card in enumerate(cards):
+        out += _card(card, st, "How the score is built" if i == 0 else None)
+    if not cards and risk.get("summary"):
         out += [Spacer(1, 2 * mm), Paragraph(plain(risk["summary"]), st["muted"]), Spacer(1, 5 * mm)]
     return out
 
@@ -549,8 +564,8 @@ def _ahead(report: dict, st: dict) -> list:
                          Paragraph(plain(f"{m['baseline']:.1f} {unit}"), st["cell"]),
                          Paragraph(plain(f"{m['future']:.1f} {unit}"), st["cell"]),
                          Paragraph(plain(change), st["cell"])])
-        method = (proj.get("provenance") or {}).get("method")
-        note = ". ".join(x for x in (proj.get("scenario"), method) if x)
+        method = (proj.get("provenance") or {}).get("method") or ""
+        note = ". ".join(x for x in (proj.get("scenario"), method[:1].upper() + method[1:]) if x)
         out += [_grid(rows, [80 * mm, 30 * mm, 30 * mm, WIDTH - 140 * mm]), Spacer(1, 1.5 * mm),
                 Paragraph(plain(note + "."), st["fine"])]
     if fwi:
@@ -595,7 +610,8 @@ def _right_now(report: dict, st: dict) -> list:
 
 def _checklist(items: list[dict], width: float, checkable: bool, st: dict) -> Table:
     rows = [[Checkbox() if checkable else Paragraph("•", st["body"]),
-             Paragraph(segments(i.get("segments")), st["body"])] for i in items]
+             Paragraph(segments(i.get("segments")) + products(i.get("products")), st["body"])]
+            for i in items]
     t = Table(rows or [[Spacer(1, 1), Spacer(1, 1)]], colWidths=[6 * mm, width - 6 * mm])
     t.setStyle(TableStyle([("VALIGN", (0, 0), (-1, -1), "TOP"), ("LEFTPADDING", (0, 0), (-1, -1), 0),
                            ("RIGHTPADDING", (0, 0), (-1, -1), 0), ("TOPPADDING", (0, 0), (-1, -1), 1.6),
@@ -628,17 +644,18 @@ def _plan(app: dict, st: dict) -> list:
                          [col, col], 8 * mm)]))
             continue
         key = plan["key"]
-        out += [CondPageBreak(60 * mm), Paragraph(plain(NAMES.get(key, plan["label"])), st["h2"])]
+        head = [Paragraph(plain(NAMES.get(key, plan["label"])), st["h2"])]
         if plan.get("note"):
-            out.append(Paragraph(plain(plan["note"]), st["muted"]))
+            head.append(Paragraph(plain(plan["note"]), st["muted"]))
         phase_style = ParagraphStyle(f"phase-{key}", parent=st["label"],
                                      textColor=colors.HexColor(HAZARD_TEXT.get(key, "#5B6655")))
         cells = [[Spacer(1, 2 * mm), Paragraph(plain(ph["label"]).upper(), phase_style), Spacer(1, 1 * mm),
                   _checklist(ph.get("items") or [], col, ph["key"] in CHECKABLE, st)]
                  for ph in plan.get("phases") or []]
-        for i in range(0, len(cells), 2):
-            pair = cells[i:i + 2]
-            out.append(_columns(pair + [[Spacer(1, 1)]] * (2 - len(pair)), [col, col], 8 * mm))
+        rows = [_columns(cells[i:i + 2] + [[Spacer(1, 1)]] * (2 - len(cells[i:i + 2])), [col, col], 8 * mm)
+                for i in range(0, len(cells), 2)]
+        out.append(KeepTogether(head + rows[:1]))
+        out += rows[1:]
     return out
 
 

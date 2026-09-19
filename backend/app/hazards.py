@@ -332,6 +332,10 @@ def build_projection(base: S.DailySeries, future: S.DailySeries) -> dict:
     def days32(s):
         return S.per_year(S.frequency(s, "temperature_2m_max", lambda v: v >= 32))
 
+    # By the sea the heat that grows is often at night (see the heat card's headline).
+    def tropical(s):
+        return S.per_year(S.frequency(s, "temperature_2m_min", lambda v: v >= 20))
+
     def rx1day(s):
         return S.mean(list(S.complete_years_only(s, S.annual_max(s, "precipitation_sum")).values()))
 
@@ -360,13 +364,14 @@ def build_projection(base: S.DailySeries, future: S.DailySeries) -> dict:
         "metrics": [m for m in (
             delta(days35, "hot_days_35", "days/year"),
             delta(days32, "hot_days_32", "days/year"),
+            delta(tropical, "tropical_nights", "nights/year"),
             delta(rx1day, "rx1day", "mm"),
         ) if m],
     }
 
 
 PROJECTION_BY_HAZARD = {
-    "heat": ("hot_days_35", "hot_days_32"),
+    "heat": ("hot_days_35", "hot_days_32", "tropical_nights"),
     "rain": ("rx1day",),
 }
 

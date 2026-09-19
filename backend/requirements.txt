@@ -9,3 +9,7 @@ python-dotenv>=1.0
 fal-client>=1.0        # fal.ai queue, results and CDN uploads
 pillow>=11.0           # on-screen text of the video briefing
 imageio-ffmpeg>=0.6    # a bundled ffmpeg binary, nothing to install by hand
+
+# The report as a PDF.
+reportlab>=4.2         # the document
+fonttools>=4.50        # a static cut of the display face for it

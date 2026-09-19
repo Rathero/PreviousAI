@@ -37,6 +37,7 @@ let located = null;      // the point the address resolved to
 let token = 0;
 let abort = null;
 let active = null;       // the risk picked on the page
+let horizon = "today";   // the risks as they are today, or around 2050
 let activePlan = "emergency";
 let progressTimer = null;
 let householdDraft = [];
@@ -71,6 +72,34 @@ function segmentsHtml(segments) {
     }
     return `<a class="plain-link" href="${esc(s.url)}" target="_blank" rel="noopener">${esc(s.text)}</a>`;
   }).join("");
+}
+
+// A product proposed for a step: the store's photo, what it is, the price and a direct
+// link to the store's page. Photos load from the stores without a referrer.
+const EUROS = new Intl.NumberFormat("en-IE", { style: "currency", currency: "EUR" });
+
+function productHtml(p) {
+  return `<a class="product" href="${esc(p.url)}" target="_blank" rel="noopener${p.partner ? " sponsored" : ""}">
+    <span class="product-img"><img src="${esc(p.image)}" alt="" loading="lazy" decoding="async"
+      referrerpolicy="no-referrer"></span>
+    <span class="product-body">
+      <span class="product-name">${esc(p.name)}</span>
+      <span class="product-what">${esc(p.what)}</span>
+      <span class="product-buy"><b>${EUROS.format(p.price)}</b> · ${esc(p.store)}<span aria-hidden="true"> →</span></span>
+    </span></a>`;
+}
+
+function productsHtml(item) {
+  const list = item.products || [];
+  return list.length ? `<div class="products">${list.map(productHtml).join("")}</div>` : "";
+}
+
+function pricesNote(plan) {
+  const items = plan.items || plan.phases.flatMap((ph) => ph.items);
+  const seen = ((data && data.action_plan) || {}).prices_seen;
+  if (!seen || !items.some((i) => (i.products || []).length)) return "";
+  return `<p class="plan-fine">Products link to each store's own page. Prices as seen on
+    ${niceDate(seen)}; they change.</p>`;
 }
 
 // The three steps of the summary: the emergency numbers, the first step against the
@@ -126,8 +155,9 @@ function heroLoading() {
 
 function renderHero() {
   stopProgress();
-  $("#heroTitle").textContent = data.headline.title;
-  $("#heroText").textContent = data.headline.text;
+  const head = horizon === "2050" && data.ahead ? data.ahead : data.headline;
+  $("#heroTitle").textContent = head.title;
+  $("#heroText").textContent = head.text;
 }
 
 function heroError(message) {
@@ -144,6 +174,7 @@ function bars(score) {
 }
 
 function tileHtml(key, risk) {
+  if (risk && horizon === "2050" && data && data.ahead) return futureTileHtml(key);
   const loading = !risk;
   const score = risk ? risk.score : null;
   const value = score == null ? "—" : `${score}%`;
@@ -235,12 +266,14 @@ function calmHtml() {
 }
 
 function renderDetail() {
+  if (horizon === "2050" && data && data.ahead) { renderFutureDetail(); return; }
   const el = $("#detail");
   const risk = active && data && (data.risks || []).find((r) => r.key === active);
   el.dataset.view = !risk ? "summary" : risk.worth ? "risk" : "calm";
   if (!risk) el.innerHTML = summaryHtml();
   else if (!risk.worth) el.innerHTML = calmHtml();
   else el.innerHTML = storyHtml(risk) + riskStepsHtml(risk);
+  addMoney(el, risk);
 }
 
 function detailLoading() {
@@ -255,6 +288,206 @@ function select(key) {
   $$(".tile", $("#tiles")).forEach((t) => t.setAttribute("aria-pressed", String(t.dataset.family === active)));
   renderDetail();
   media.select(active && data ? data.risks.find((r) => r.key === active) : null);
+}
+
+// ------------------------------------------------------------------ 2050
+// The same four risks around 2050: how the climate behind each one changes, from the
+// report's projections. Scores, official maps and past events describe today, so the
+// 2050 view shows the change and its numbers instead of a score.
+function ahead(key) { return ((data && data.ahead && data.ahead.risks) || {})[key] || {}; }
+
+const shiftNumber = (v) => String(Math.abs(v) >= 10 ? Math.round(v) : Math.round(v * 10) / 10);
+
+function shiftHtml(bars) {
+  const top = Math.max(bars.from.value, bars.to.value) || 1;
+  const unit = bars.unit ? ` ${bars.unit}` : "";
+  const row = (p, cls) => `
+    <span class="shift-row${cls}"><span class="shift-label">${esc(p.label)}</span>
+      <span class="shift-track"><i style="width:${Math.max(4, Math.round((p.value / top) * 100))}%"></i></span>
+      <span class="shift-num">${esc(shiftNumber(p.value) + unit)}</span></span>`;
+  return `<span class="tile-shift">${row(bars.from, "")}${row(bars.to, " to")}</span>`;
+}
+
+function futureTileHtml(key) {
+  const f = ahead(key);
+  const parts = /^([+−-]?\d+)\s*(.*)$/.exec(f.change || "");
+  const value = !f.available ? "—"
+    : parts ? `${esc(parts[1])}<small>${esc(parts[2])}</small>` : `<small class="word">${esc(f.change || "")}</small>`;
+  const dim = !f.available || f.direction === "same";
+  return `
+    <button type="button" class="tile future${dim ? " dim" : ""}" data-family="${key}"
+      aria-pressed="${active === key}">
+      <span class="tile-main">
+        <span class="tile-name"><span class="tile-dot" aria-hidden="true"></span>${NAMES[key]}</span>
+        <span class="tile-value">${value}</span>
+        ${f.bars ? shiftHtml(f.bars) : ""}
+        <span class="tile-fact">${esc(f.fact || "")}</span>
+      </span>
+      <svg class="tile-icon" width="58" height="58" viewBox="0 0 24 24" fill="none" stroke-width="1.1"
+        stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[key]}</svg>
+    </button>`;
+}
+
+function futureSummaryHtml() {
+  const items = data.ahead.highlights || [];
+  const left = `
+    <div class="col">
+      <h2>What changes by 2050</h2>
+      ${items.length ? `<ul class="facts ahead-facts">${items.map((f) =>
+        `<li data-family="${esc(f.family)}"><b>${esc(f.number)}</b><span>${esc(f.text)}</span></li>`).join("")}</ul>`
+        : `<p class="muted">The climate models project little change here by 2050.</p>`}
+      <p class="ahead-fine">${esc(data.ahead.scenario)}</p>
+    </div>`;
+  const all = plans().flatMap(checkable);
+  return left + stepsColumn("Your action plan", summarySteps(), all, "See the full plan →", "emergency");
+}
+
+function futureStoryHtml(key) {
+  const f = ahead(key);
+  const rows = f.rows || [];
+  return `
+    <div class="col">
+      <h2>${esc(f.title)}</h2>
+      ${rows.length ? `<ul class="ahead-rows" data-family="${esc(key)}">${rows.map((r) => `
+        <li><span class="ahead-label">${esc(r.label)}</span>
+          <span class="ahead-values"><b>${esc(r.from)}</b><span class="ahead-arrow" aria-hidden="true">→</span>
+            <span class="visually-hidden">to</span><b>${esc(r.to)}</b>
+            <span class="ahead-change">${esc(r.change)}</span></span></li>`).join("")}</ul>`
+        : `<p class="muted">${esc(f.fact)}</p>`}
+      ${(f.notes || []).map((n) => `<p class="ahead-fine">${esc(n)}</p>`).join("")}
+      ${f.periods ? `<p class="ahead-fine">${esc(f.periods)} ${esc(data.ahead.scenario)}</p>` : ""}
+    </div>`;
+}
+
+function renderFutureDetail() {
+  const el = $("#detail");
+  const risk = active && (data.risks || []).find((r) => r.key === active);
+  if (!risk) {
+    el.dataset.view = "summary";
+    el.innerHTML = futureSummaryHtml();
+    addMoney(el, null);
+    return;
+  }
+  const f = ahead(risk.key);
+  if (!f.available && !(f.notes || []).length && !risk.worth) {
+    el.dataset.view = "calm";
+    el.innerHTML = `<div class="calm"><h2>Nothing to prepare for here</h2><p>${esc(f.fact)}</p></div>`;
+    return;
+  }
+  el.dataset.view = "risk";
+  el.innerHTML = futureStoryHtml(risk.key) + (riskStepsHtml(risk) || `
+    <div class="col">
+      <h2>What to do first</h2>
+      <p class="muted">Today this risk scores low here, so your plan has no steps for it yet.</p>
+      <button type="button" class="more" data-plan-open="emergency">See the full plan →</button>
+    </div>`);
+  addMoney(el, risk);
+}
+
+// ------------------------------------------------------------------ public money
+// Grants, tax deductions and public cover that can pay for part of the plan, from the
+// report's checked catalogue: who can apply, how much, until when, and the official page.
+let grantsFamily = "all";
+let grantsFocus = null;
+
+function grants() { return (data && data.grants) || { items: [], groups: [], families: {} }; }
+
+function grantsFor(key) {
+  const items = grants().items || [];
+  if (!key || key === "all") return items;
+  return items.filter((g) => (g.families || []).includes(key));
+}
+
+// The strip at the bottom of the card: how many programmes can pay for this.
+function moneyHtml(key) {
+  const g = grants();
+  const text = key ? ((g.families || {})[key] || {}).text : g.summary;
+  if (!text) return "";
+  return `
+    <button type="button" class="money" data-grants-open="${esc(key || "all")}">
+      <span class="money-icon" aria-hidden="true">€</span>
+      <span class="money-text">${esc(text)}</span>
+      <span class="money-go">See which →</span>
+    </button>`;
+}
+
+function addMoney(el, risk) {
+  if (el.dataset.view === "calm") return;
+  el.insertAdjacentHTML("beforeend", moneyHtml(risk ? risk.key : null));
+}
+
+function grantHtml(item) {
+  const dots = (item.families || []).map((f) =>
+    `<span class="dot" data-family="${esc(f)}" title="${esc(NAMES[f] || f)}"></span>`).join("");
+  return `
+    <article class="grant">
+      <div class="grant-head">
+        <h4>${esc(item.name)}</h4>
+        <span class="grant-status" data-status="${esc(item.status)}">${esc(item.status_label)}</span>
+      </div>
+      <p class="grant-body">${esc(item.official_name ? `${item.official_name} · ${item.body}` : item.body)}</p>
+      <p class="grant-amount">${esc(item.amount)}</p>
+      <p class="grant-funds">${esc(item.funds)}</p>
+      ${item.note ? `<p class="grant-note">${esc(item.note)}</p>` : ""}
+      <div class="grant-foot">
+        <span class="grant-dots">${dots}</span>
+        <a class="plain-link" href="${esc(item.url)}" target="_blank" rel="noopener">Official page</a>
+        ${item.ref ? `<span class="grant-ref">${esc(item.ref)}</span>` : ""}
+      </div>
+    </article>`;
+}
+
+function renderGrants() {
+  const g = grants();
+  const families = ORDER.filter((k) => grantsFor(k).length);
+  if (grantsFamily !== "all" && !families.includes(grantsFamily)) grantsFamily = "all";
+  const tabs = ["all", ...families].map((k) => `
+    <button type="button" class="tab" role="tab" data-grants-family="${esc(k)}" aria-selected="${k === grantsFamily}">
+      ${k !== "all" ? `<span class="dot" data-family="${esc(k)}"></span>` : ""}
+      ${k === "all" ? "All" : NAMES[k]}<span class="count">${grantsFor(k).length}</span></button>`).join("");
+  const list = grantsFor(grantsFamily);
+  const groups = (g.groups || []).map((grp) => {
+    const items = list.filter((i) => i.group === grp.key);
+    if (!items.length) return "";
+    return `
+      <section class="grant-group">
+        <h3>${esc(grp.label)}</h3>
+        ${grp.note ? `<p class="grant-group-note">${esc(grp.note)}</p>` : ""}
+        <div class="grant-list">${items.map(grantHtml).join("")}</div>
+      </section>`;
+  }).join("");
+  $("#grants").innerHTML = `
+    ${g.intro ? `<p class="plan-note">${esc(g.intro)}</p>` : ""}
+    ${families.length > 1 ? `<div class="tabs" role="tablist" aria-label="Risks">${tabs}</div>` : ""}
+    ${groups || `<p class="muted">No public programme for this risk here yet.</p>`}
+    ${g.note ? `<p class="plan-fine">${esc(g.note)}</p>` : ""}`;
+}
+
+function openGrants(key) {
+  if (!data) return;
+  grantsFamily = key || "all";
+  renderGrants();
+  grantsFocus = document.activeElement;
+  $("#grantsDialog").hidden = false;
+  document.body.classList.add("modal-open");
+  setTimeout(() => $("#grantsClose").focus(), 0);
+}
+
+function closeGrants() {
+  if ($("#grantsDialog").hidden) return;
+  $("#grantsDialog").hidden = true;
+  if ($("#viewer").hidden && $("#planDialog").hidden) document.body.classList.remove("modal-open");
+  if (grantsFocus && document.contains(grantsFocus)) grantsFocus.focus();
+}
+
+function setHorizon(next) {
+  horizon = next === "2050" ? "2050" : "today";
+  $("#report").dataset.horizon = horizon;
+  $$(".horizon-btn").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.horizon === horizon)));
+  if (!data) return;
+  renderHero();
+  renderTiles();
+  renderDetail();
 }
 
 // ------------------------------------------------------------------ full plan
@@ -274,7 +507,7 @@ function renderPlanTabs() {
 function planItemHtml(item, isCheckable, done) {
   if (!isCheckable) return `<li class="bullet"><span>${segmentsHtml(item.segments)}</span></li>`;
   return `<li><label class="check"><input type="checkbox" data-item="${esc(item.id)}"
-    ${done.has(item.id) ? "checked" : ""}><span>${segmentsHtml(item.segments)}</span></label></li>`;
+    ${done.has(item.id) ? "checked" : ""}><span>${segmentsHtml(item.segments)}</span></label>${productsHtml(item)}</li>`;
 }
 
 function renderPlan() {
@@ -288,15 +521,15 @@ function renderPlan() {
         `<li>${esc(a.text)}</li>`).join("")}</ul></section>`
       : "";
     $("#plan").innerHTML = `${household}<ul class="emergency">
-      ${plan.items.map((i) => planItemHtml(i, true, done)).join("")}</ul>`;
+      ${plan.items.map((i) => planItemHtml(i, true, done)).join("")}</ul>${pricesNote(plan)}`;
     return;
   }
   const note = plan.note ? `<p class="plan-note">${esc(plan.note)}</p>` : "";
   $("#plan").innerHTML = `${note}<div class="phases" data-family="${esc(plan.key)}">${plan.phases.map((ph) => `
-    <section class="phase">
+    <section class="phase" data-phase="${esc(ph.key)}">
       <h3>${esc(ph.label)}</h3>
       <ul>${ph.items.map((i) => planItemHtml(i, CHECKABLE.has(ph.key), done)).join("")}</ul>
-    </section>`).join("")}</div>`;
+    </section>`).join("")}</div>${pricesNote(plan)}`;
 }
 
 let planFocus = null;
@@ -332,6 +565,49 @@ function onChecked(e) {
   if (!$("#planDialog").hidden) { renderPlanTabs(); renderPlan(); }
   const again = $(`${inDetail ? "#detail" : "#plan"} input[data-item="${CSS.escape(id)}"]`);
   if (again) again.focus();
+}
+
+// ------------------------------------------------------------------ PDF
+let pdfBusy = false;
+
+// Downloads the report as a PDF; on a phone, where people share rather than save, it
+// opens the share sheet when the browser can share files.
+async function sharePdf() {
+  if (pdfBusy) return;
+  pdfBusy = true;
+  const label = $("#pdfLabel");
+  $("#pdfBtn").disabled = true;
+  label.textContent = "Preparing PDF…";
+  try {
+    const resp = await api.reportPdf({
+      address: params.address, home: params.home, floor: params.floor,
+      who: params.who.join(",") || undefined,
+    });
+    const blob = await resp.blob();
+    const match = /filename="([^"]+)"/.exec(resp.headers.get("Content-Disposition") || "");
+    const name = match ? match[1] : "previous-ai-report.pdf";
+    const file = new File([blob], name, { type: "application/pdf" });
+    const phone = window.matchMedia && window.matchMedia("(pointer: coarse)").matches;
+    if (phone && navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file], title: document.title });
+    } else {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+    }
+    label.textContent = "PDF report";
+  } catch (err) {
+    // Closing the share sheet is not an error.
+    label.textContent = err.name === "AbortError" ? "PDF report" : "PDF failed · try again";
+  } finally {
+    pdfBusy = false;
+    $("#pdfBtn").disabled = !data;
+  }
 }
 
 // ------------------------------------------------------------------ footer
@@ -391,6 +667,8 @@ async function loadReport({ keep = false } = {}) {
     renderTiles();
     renderDetail();
     renderFooter();
+    $("#horizon").hidden = !data.ahead;
+    $("#pdfBtn").disabled = pdfBusy;
     const illustrated = (data.risks || []).filter((r) => r.illustration).sort((a, b) => b.score - a.score);
     media.setPreviews(illustrated);
     media.select(active ? data.risks.find((r) => r.key === active) : null);
@@ -404,6 +682,7 @@ async function loadReport({ keep = false } = {}) {
     heroError(err.status === 404 ? err.message
       : "Our data sources are busy right now. Please try again in a few minutes.");
     $("#tiles").innerHTML = "";
+    $("#horizon").hidden = true;
     $("#detail").dataset.view = "empty";
     $("#detail").innerHTML = "";
     if (!located) media.error("We could not find this address.");
@@ -433,6 +712,22 @@ export function initReport(appRef) {
     const tile = e.target.closest(".tile");
     if (tile && !tile.disabled && data) select(tile.dataset.family);
   });
+  $("#horizon").addEventListener("click", (e) => {
+    const btn = e.target.closest(".horizon-btn");
+    if (btn) setHorizon(btn.dataset.horizon);
+  });
+  $("#detail").addEventListener("click", (e) => {
+    const money = e.target.closest("[data-grants-open]");
+    if (money) openGrants(money.dataset.grantsOpen);
+  });
+  $("#grantsDialog").addEventListener("click", (e) => {
+    if (e.target.closest("[data-close]")) { closeGrants(); return; }
+    const tab = e.target.closest("[data-grants-family]");
+    if (tab) { grantsFamily = tab.dataset.grantsFamily; renderGrants(); }
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && !$("#grantsDialog").hidden) closeGrants();
+  });
 
   $("#detail").addEventListener("click", (e) => {
     const more = e.target.closest("[data-plan-open]");
@@ -442,6 +737,11 @@ export function initReport(appRef) {
   });
   $("#detail").addEventListener("change", onChecked);
   $("#plan").addEventListener("change", onChecked);
+  // A store photo that does not load leaves an empty frame, not a broken image.
+  $("#plan").addEventListener("error", (e) => {
+    const frame = e.target.closest && e.target.closest(".product-img");
+    if (frame) frame.classList.add("broken");
+  }, true);
 
   $("#planTabs").addEventListener("click", (e) => {
     const tab = e.target.closest(".tab");
@@ -485,6 +785,8 @@ export function initReport(appRef) {
     else if (!$("#planDialog").hidden) closePlan();
   });
 
+  $("#pdfBtn").addEventListener("click", sharePdf);
+
   $("#briefingBtn").addEventListener("click", () => {
     const loc = located || (data && data.location);
     if (!loc) return;
@@ -510,12 +812,17 @@ export function showReport(search) {
   located = null;
   active = null;
   activePlan = "emergency";
+  setHorizon("today");
+  $("#horizon").hidden = true;
+  closeGrants();
   $("#report").dataset.active = "";
   $("#editLink").setAttribute("href",
     `/?${new URLSearchParams({ address: params.address, home: params.home || "house", floor: params.floor || "" })}`);
   $("#repFoot").textContent = "";
   openHousehold(false);
   closePlan();
+  $("#pdfBtn").disabled = true;
+  $("#pdfLabel").textContent = "PDF report";
   const h = app && app.health;
   $("#briefingBtn").hidden = !(h && h.fal && h.fal.ffmpeg);
   renderHeader();

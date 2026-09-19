@@ -114,15 +114,26 @@
     <div class="hero-text" aria-live="polite">
       <h1 id="heroTitle"></h1>
       <p id="heroText"></p>
+      <div class="horizon" id="horizon" role="group" aria-label="Show the risks today or around 2050" hidden>
+        <button type="button" class="horizon-btn" data-horizon="today" aria-pressed="true">Today</button>
+        <button type="button" class="horizon-btn" data-horizon="2050" aria-pressed="false">2050</button>
+      </div>
     </div>
     <div class="hero-media">
       <button type="button" class="thumb" id="thumb" aria-label="Open the street view of the home">
         <span class="thumb-media" id="thumbMedia"></span>
         <span class="thumb-label" id="thumbLabel"></span>
       </button>
-      <button type="button" class="ghost-btn" id="briefingBtn" hidden>
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"></path></svg>
-        Video briefing</button>
+      <div class="hero-actions">
+        <button type="button" class="ghost-btn" id="briefingBtn" hidden>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4.5v15l13-7.5z"></path></svg>
+          Video briefing</button>
+        <button type="button" class="ghost-btn" id="pdfBtn" disabled>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+               stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3v12M7 10l5 5 5-5M5 21h14"></path></svg>
+          <span id="pdfLabel">PDF report</span></button>
+      </div>
     </div>
   </section>
 
@@ -157,6 +168,18 @@
       </div>
       <div class="tabs" id="planTabs" role="tablist" aria-label="Plans"></div>
       <div class="plan scroll" id="plan"></div>
+    </div>
+  </div>
+
+  <!-- Public money: grants, tax deductions and public cover for this home -->
+  <div class="overlay" id="grantsDialog" hidden>
+    <div class="overlay-backdrop" data-close></div>
+    <div class="overlay-panel grants-panel glass-solid" role="dialog" aria-modal="true" aria-labelledby="grantsTitle">
+      <div class="panel-head">
+        <h2 id="grantsTitle">Public money for this home</h2>
+        <button type="button" class="icon-btn" id="grantsClose" data-close aria-label="Close">&times;</button>
+      </div>
+      <div class="grants scroll" id="grants"></div>
     </div>
   </div>
 </main>
