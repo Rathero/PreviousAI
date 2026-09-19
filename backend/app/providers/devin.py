@@ -48,13 +48,14 @@ def _request(method: str, path: str, *, json: dict | None = None,
         except httpx.HTTPError as exc:
             last = f"{type(exc).__name__}: {exc}"
         else:
-            if r.status_code == 429 or r.status_code >= 500:
-                last = f"HTTP {r.status_code}"
-            elif r.status_code >= 400:
+            # Recommended by Norma — fixed with Claude Opus 5 via Claude Code: no else after the
+            # raise. Reordered rather than dropped, so a 429 or 5xx still goes on to the retry.
+            if r.status_code < 400:
+                return r.json() if r.content else {}
+            if r.status_code != 429 and r.status_code < 500:
                 raise DevinUnavailable(f"Devin API {method} {path}: HTTP {r.status_code} "
                                        f"{r.text[:300]}")
-            else:
-                return r.json() if r.content else {}
+            last = f"HTTP {r.status_code}"
         time.sleep(2 ** attempt * 2)
     raise DevinUnavailable(f"Devin API {method} {path} failed after {RETRIES} tries: {last}")
 

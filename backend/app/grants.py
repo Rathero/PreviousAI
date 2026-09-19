@@ -15,10 +15,12 @@ hear that there is none here, not find an empty list. Nothing here scores, and a
 never changes which risks or measures are shown. Amounts and deadlines change: the
 official page decides, and the view says so.
 
-Checked on 19 September 2026 against the official sources linked in each entry (BOE,
-DOGC, Agencia Tributaria, MITECO, the Consorcio, the Generalitat and the town halls).
-Covered so far: Spain-wide programmes, Catalonia, and the demo towns El Masnou and
-Vielha e Mijaran.
+Checked on 19 September 2026, twice: a first pass that found the programmes, and a second
+that read each claim in its primary source (the BOE texts of the laws and royal decrees,
+the Consorcio's and Protección Civil's rules, the Generalitat's call and its DOGC entry in
+CIDO, El Masnou's fiscal ordinance and the Council of Ministers' declarations). Claims
+that could not be read in a primary source were dropped. Covered so far: Spain-wide
+programmes, Catalonia, and the demo towns El Masnou and Vielha e Mijaran.
 """
 
 from __future__ import annotations
@@ -67,7 +69,8 @@ PROGRAMMES: list[dict] = [
         "amount": "20 % of up to €5,000 a year if the demand drops 7 %; 40 % of up to €7,500 if "
                   "energy use drops 30 % or the home reaches class A or B.",
         "note": "Payments until 31 Dec 2026, with the final certificate issued before 1 Jan 2027. "
-                "Pay by card or transfer; boilers and other fossil-fuel equipment do not count.",
+                "Pay by card or transfer; equipment that burns fossil fuels does not count, and "
+                "any grant for the same works is subtracted.",
         "status": "open", "deadline": "2026-12-31",
         "ref": "Law 35/2006, add. provision 50 (Royal Decree-law 7/2026)",
         "url": "https://www.boe.es/buscar/act.php?id=BOE-A-2006-20764",
@@ -124,14 +127,15 @@ PROGRAMMES: list[dict] = [
         "body": "Ministry of Housing, with calls run by each region",
         "where": {"country": "ES"}, "who": "household", "families": ["heat", "wildfire"],
         "funds": "Insulation and heat pumps that cut heating and cooling demand, structural safety "
-                 "works and fire protection of the building envelope, in buildings finished "
-                 "before 2006.",
-        "amount": "40 % up to €7,500 for part of the envelope; 65–80 % up to €13,000–20,500 per home "
-                  "for a whole building; up to 100 % for vulnerable households.",
-        "note": "Owners, owners' associations and tenants with the owner's consent can apply. "
-                "In force since 24 Apr 2026.",
-        "notes_by_place": {"Catalonia": "The Catalan call has not opened yet; it is expected in "
-                                        "the second half of 2026."},
+                 "works and bringing the building envelope up to fire-protection standards, in "
+                 "buildings (houses included) finished before 2006.",
+        "amount": "A whole building or house: 65 % up to €13,000 per home (energy savings of "
+                  "45–60 %) or 80 % up to €20,500 (60 % or more), and 40 % up to €8,000 for "
+                  "safety works. A flat's envelope: 40 % up to €7,500. Up to 100 % for vulnerable "
+                  "households.",
+        "note": "Owners, owners' associations and tenants whose contract lets them do the works "
+                "can apply. In force since 24 Apr 2026; each region opens its own calls.",
+        "notes_by_place": {"Catalonia": "No Catalan call had opened when this was checked."},
         "status": "upcoming", "deadline": None,
         "ref": "Royal Decree 326/2026",
         "url": "https://www.boe.es/diario_boe/txt.php?id=BOE-A-2026-8872",
@@ -145,9 +149,10 @@ PROGRAMMES: list[dict] = [
         "funds": "Floods from rain, rivers, snowmelt and sea surges, storms with gusts over "
                  "120 km/h and earthquakes, for anyone with a home or contents policy in force.",
         "amount": "The damage your policy covers, with no excess for homes.",
-        "note": "Not covered: water that gets in through the roof or drains, landslides, "
-                "avalanches, and wildfire (your policy's own fire cover pays for that). New "
-                "policies wait 7 days; report the damage within 7 days.",
+        "note": "Not covered: rain that gets in through the roof, drains or patios, landslides "
+                "(unless an extraordinary flood causes them at the same time), avalanches, and "
+                "wildfire (your policy's own fire cover pays for that). New policies wait 7 days; "
+                "report the damage within 7 days.",
         "status": "permanent", "deadline": None,
         "ref": "Royal Decree 300/2004",
         "url": "https://www.consorseguros.es/en/preguntas-frecuentes/seguros-de-riesgos-extraodinarios",
@@ -164,12 +169,13 @@ PROGRAMMES: list[dict] = [
                  "associations for common parts.",
         "amount": "Up to €15,120 if the home is destroyed; 50 % of structural damage up to "
                   "€10,320; essential belongings up to €2,580.",
-        "note": "Apply within one month of the event. It is the only public route for avalanche "
-                "and landslide damage.",
+        "note": "Apply within one month of the day after the event ends. It also covers avalanche "
+                "and landslide damage, which the Consorcio does not.",
         "notes_by_place": {
-            EL_MASNOU: "In 2026 the Government declared several Catalan rain and flood episodes and "
-                       "the Tiana wildfire serious emergencies: if your home was damaged, ask the "
-                       "Subdelegation in Barcelona now, as the one-month windows are closing.",
+            EL_MASNOU: "On 15 Sep 2026 the Government declared several Catalonia-wide rain, flood "
+                       "and storm episodes of August 2026 serious emergencies: if your home was "
+                       "damaged, ask the Subdelegation in Barcelona now, as the one-month windows "
+                       "are closing.",
             VIELHA: "The wildfire of 2 Aug 2026 in Vielha e Mijaran was declared a serious "
                     "emergency on 15 Sep 2026: if your home was damaged, ask the Subdelegation in "
                     "Lleida.",
@@ -186,9 +192,12 @@ PROGRAMMES: list[dict] = [
         "body": "Agència de l'Habitatge de Catalunya, with the Institut Català de Finances",
         "where": {"region": "Catalonia"}, "who": "owners", "communities_only": True,
         "families": ["heat"],
-        "funds": "Renovating the façades, roofs and energy systems of a block of flats.",
-        "amount": "Fixed-rate loans from €30,000 per building, up to €20,000 per home.",
-        "note": "Check the loan terms on the official page.",
+        "funds": "Renovating a block of flats: energy efficiency, structure, façades, roofs and "
+                 "accessibility.",
+        "amount": "Loans from €30,000 per building and up to €20,000 per home, repaid over 15 "
+                  "years at a very low interest.",
+        "note": "Applied for through the Institut Català de Finances; the community must be "
+                "solvent (arrears of 5 % or less). Closes earlier if the budget runs out.",
         "status": "open", "deadline": "2026-12-30",
         "ref": "DOGC 9567 (extension of the call)",
         "url": "https://tramits.gencat.cat/ca/tramits/tramits-temes/21909-Ajuts-prestecs-per-a-la-rehabilitacio",
@@ -217,11 +226,13 @@ PROGRAMMES: list[dict] = [
         "official_name": "Bonificacions de l'impost sobre construccions, instal·lacions i obres (ICIO)",
         "body": "Ajuntament del Masnou",
         "where": {"municipalities": [EL_MASNOU]}, "who": "household", "families": ["heat"],
-        "funds": "Solar and other alternative-energy systems, water-saving works, and full façade "
-                 "or roof restorations the council declares of special interest.",
-        "amount": "Up to 95 % off the municipal building-works tax (ICIO).",
-        "note": "Ask the town hall how to claim it, and whether a heat pump counts as alternative "
-                "energy.",
+        "funds": "Solar panels, other alternative-energy systems such as a heat pump, water-saving "
+                 "and rainwater reuse, and full façade or roof restorations, when they are not "
+                 "already required by law.",
+        "amount": "95 % off the municipal building-works tax (ICIO).",
+        "note": "Ask for it with the works permit: later requests are not admitted. Except for "
+                "solar, the council has to declare the works of special interest; the bonuses do "
+                "not add up.",
         "status": "permanent", "deadline": None,
         "ref": "Fiscal ordinance 8 (September 2025)",
         "url": "https://elmasnou.cat/media/repository/documents_oficials/normativa_fiscal/"
@@ -235,15 +246,17 @@ GAPS = {
     "flood": [
         ("ES", "Spain's flood-adaptation grants (Royal Decree 590/2026) only reach the town halls "
                "of the 62 municipalities hit by the 2024 DANA."),
-        ("Catalonia", "No Catalan programme pays households for flood barriers or valves yet."),
+        ("Catalonia", "We found no Catalan programme that pays households for flood barriers or "
+                      "valves."),
     ],
     "wildfire": [
         ("Catalonia", "Wildfire-prevention money in Catalonia goes to town halls and forest "
-                      "owners; none pays a household to clear its own plot."),
+                      "owners; we found none that pays a household to clear its own plot."),
     ],
     "avalanche": [
-        ("ES", "No public programme pays for protecting a private home against avalanches, and "
-               "the Consorcio does not cover them: check that your own policy does."),
+        ("ES", "We found no public programme that pays for protecting a private home against "
+               "avalanches, and the Consorcio does not cover them: check that your own policy "
+               "does."),
     ],
 }
 

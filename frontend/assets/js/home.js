@@ -1,7 +1,7 @@
 // The home address screen: address (typed, suggested or spoken), type of home and floor.
 
 import { api } from "./api.js";
-import { $, $$, esc, debounce, store, REDUCED_MOTION } from "./util.js";
+import { $, $$, esc, setHtml, debounce, store, REDUCED_MOTION } from "./util.js";
 
 let app = null;
 let kind = "house";
@@ -41,10 +41,11 @@ function closeSuggestions() {
 function renderSuggestions() {
   const list = $("#suggestions");
   if (!suggestions.length) return closeSuggestions();
-  list.innerHTML = suggestions.map((s, i) => `
+  // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+  setHtml(list, suggestions.map((s, i) => `
     <li role="option" id="sugg-${i}" data-i="${i}" aria-selected="${i === active}">
       <span class="s1">${esc(s.line1)}</span>${s.line2 ? `<span class="s2">${esc(s.line2)}</span>` : ""}
-    </li>`).join("");
+    </li>`).join(""));
   list.hidden = false;
   $("#address").setAttribute("aria-expanded", "true");
   if (active >= 0) $("#address").setAttribute("aria-activedescendant", `sugg-${active}`);

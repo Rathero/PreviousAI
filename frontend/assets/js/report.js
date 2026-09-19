@@ -163,8 +163,9 @@ function renderHeader() {
   const approx = loc && (loc.precision === "town" || loc.precision === "place" || loc.address_not_found);
   const note = ((data && data.notes) || []).find((n) => /^The (analysed point|address)/.test(n)) || "";
   $("#addrLine1").textContent = line1;
-  $("#addrLine2").innerHTML = [esc(town), esc(home)].filter(Boolean).join(" · ")
-    + (approx ? ` · <span class="approx" title="${esc(note)}">approximate location</span>` : "");
+  // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+  setHtml($("#addrLine2"), [esc(town), esc(home)].filter(Boolean).join(" · ")
+    + (approx ? ` · <span class="approx" title="${esc(note)}">approximate location</span>` : ""));
   const badge = $("#householdBadge");
   badge.hidden = !params.who.length;
   badge.textContent = String(params.who.length);
@@ -311,10 +312,12 @@ function renderDetail() {
   const el = $("#detail");
   const risk = active && data && (data.risks || []).find((r) => r.key === active);
   el.dataset.view = !risk ? "summary" : risk.worth ? "risk" : "calm";
-  if (!risk) el.innerHTML = summaryHtml();
+  // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+  if (!risk) setHtml(el, summaryHtml());
   // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
   else if (!risk.worth) setHtml(el, calmHtml());
-  else el.innerHTML = storyHtml(risk) + riskStepsHtml(risk);
+  // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+  else setHtml(el, storyHtml(risk) + riskStepsHtml(risk));
   addMoney(el, risk);
 }
 
@@ -389,7 +392,8 @@ function renderFutureDetail() {
   const risk = active && (data.risks || []).find((r) => r.key === active);
   if (!risk) {
     el.dataset.view = "summary";
-    el.innerHTML = futureSummaryHtml();
+    // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+    setHtml(el, futureSummaryHtml());
     addMoney(el, null);
     return;
   }
@@ -533,14 +537,15 @@ function setHorizon(next) {
 function renderPlanTabs() {
   const all = plans();
   if (!all.some((p) => p.key === activePlan)) activePlan = "emergency";
-  $("#planTabs").innerHTML = all.map((p) => {
+  // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+  setHtml($("#planTabs"), all.map((p) => {
     const items = checkable(p);
     const label = p.key === "emergency" ? p.label : NAMES[p.key] || p.label;
     return `<button type="button" class="tab" role="tab" data-plan="${esc(p.key)}" aria-controls="plan"
         aria-selected="${p.key === activePlan}">
       ${p.key !== "emergency" ? `<span class="dot" data-family="${esc(p.key)}"></span>` : ""}
       ${esc(label)}<span class="count">${doneCount(items)}/${items.length}</span></button>`;
-  }).join("");
+  }).join(""));
 }
 
 function planItemHtml(item, isCheckable, done) {
@@ -559,8 +564,9 @@ function renderPlan() {
       ? `<section class="household"><h3>For your household</h3><ul>${ap.household.map((a) =>
         `<li>${esc(a.text)}</li>`).join("")}</ul></section>`
       : "";
-    $("#plan").innerHTML = `${household}<ul class="emergency">
-      ${plan.items.map((i) => planItemHtml(i, true, done)).join("")}</ul>${pricesNote(plan)}`;
+    // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+    setHtml($("#plan"), `${household}<ul class="emergency">
+      ${plan.items.map((i) => planItemHtml(i, true, done)).join("")}</ul>${pricesNote(plan)}`);
     return;
   }
   const note = plan.note ? `<p class="plan-note">${esc(plan.note)}</p>` : "";
@@ -813,8 +819,9 @@ function renderFooter() {
 
 // ------------------------------------------------------------------ household
 function renderHouseholdChips() {
-  $("#householdChips").innerHTML = PROFILES.map(([key, label]) =>
-    `<button type="button" class="chip-toggle" data-profile="${key}" aria-pressed="${householdDraft.includes(key)}">${esc(label)}</button>`).join("");
+  // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+  setHtml($("#householdChips"), PROFILES.map(([key, label]) =>
+    `<button type="button" class="chip-toggle" data-profile="${key}" aria-pressed="${householdDraft.includes(key)}">${esc(label)}</button>`).join(""));
 }
 
 function openHousehold(open) {
@@ -896,8 +903,10 @@ async function locate() {
     renderHeader();
     media.setPlace({ lat: loc.latitude, lon: loc.longitude, label: loc.label, aerial: loc.aerial,
                      zoom: loc.precision === "address" ? 18 : loc.precision === "street" ? 17 : 15 });
-  } catch (_) {
-    // The report call reports the problem.
+  } catch (err) {
+    // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+    // The report call shows the problem to the user; this leaves a trace for developers.
+    console.warn("Locating the address failed:", err);
   }
 }
 

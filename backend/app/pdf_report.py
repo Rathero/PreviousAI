@@ -400,7 +400,9 @@ async def _aerial(lat: float, lon: float, aerial: dict, zoom: int, size=(800, 50
     mosaic = Image.new("RGB", ((tx1 - tx0 + 1) * 256, (ty1 - ty0 + 1) * 256), (27, 38, 24))
     for tx, ty, content in tiles:
         try:
-            mosaic.paste(Image.open(io.BytesIO(content)).convert("RGB"), ((tx - tx0) * 256, (ty - ty0) * 256))
+            # Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+            with Image.open(io.BytesIO(content)) as img:
+                mosaic.paste(img.convert("RGB"), ((tx - tx0) * 256, (ty - ty0) * 256))
         except OSError:
             continue
     left, top = round(x0 - tx0 * 256), round(y0 - ty0 * 256)

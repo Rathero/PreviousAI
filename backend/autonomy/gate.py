@@ -30,9 +30,10 @@ from autonomy.verdict import Check  # noqa: E402
 
 def _commit(target: Path) -> str | None:
     try:
+        # Recommended by Norma — fixed with Claude Opus 5 via Claude Code
         return subprocess.run(["git", "-C", str(target), "rev-parse", "HEAD"], capture_output=True,
-                              text=True, check=True).stdout.strip()
-    except (subprocess.CalledProcessError, FileNotFoundError):
+                              text=True, check=True, timeout=60).stdout.strip()
+    except (subprocess.CalledProcessError, subprocess.TimeoutExpired, FileNotFoundError):
         return None
 
 

@@ -77,8 +77,9 @@ function renderThumb() {
   teardownThumbMap();
   const ill = selected && selected.illustration;
   if (ill) {
-    el.innerHTML = `<video ${REDUCED_MOTION ? "" : "autoplay loop"} muted playsinline preload="auto"
-      poster="${esc(ill.poster || "")}" src="${esc(ill.video)}"></video>`;
+    // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+    setHtml(el, `<video ${REDUCED_MOTION ? "" : "autoplay loop"} muted playsinline preload="auto"
+      poster="${esc(ill.poster || "")}" src="${esc(ill.video)}"></video>`);
     label.textContent = "AI illustration";
     btn.disabled = false;
     btn.setAttribute("aria-label",
@@ -86,13 +87,15 @@ function renderThumb() {
     return;
   }
   if (failure) {
-    el.innerHTML = statusHtml(esc(failure), { error: true });
+    // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+    setHtml(el, statusHtml(esc(failure), { error: true }));
     label.textContent = "";
     btn.disabled = true;
     return;
   }
   if (!place || !street) {
-    el.innerHTML = statusHtml("", { spinner: true });
+    // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+    setHtml(el, statusHtml("", { spinner: true }));
     label.textContent = "";
     btn.disabled = true;
     return;
@@ -148,8 +151,9 @@ function renderStreet() {
   teardownMap();
   const when = monthYear(street.date);
   header("Street view", when ? `Captured ${when}` : "");
-  el.innerHTML = `<img class="media-fill" alt="Street-level view of ${esc(place.label || "the home")}"
-    src="${esc(street.image)}"><span class="media-credit">${esc(street.copyright || "© Google")}</span>`;
+  // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+  setHtml(el, `<img class="media-fill" alt="Street-level view of ${esc(place.label || "the home")}"
+    src="${esc(street.image)}"><span class="media-credit">${esc(street.copyright || "© Google")}</span>`);
   el.querySelector("img").addEventListener("error", () => {
     if (mode !== "street") return;
     street = { available: false };
@@ -163,7 +167,8 @@ function renderAerial() {
   teardownMap();
   if (typeof L === "undefined" || !place.aerial) {
     header("Street view", "");
-    el.innerHTML = statusHtml("There is no street-level picture of this address.");
+    // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+    setHtml(el, statusHtml("There is no street-level picture of this address."));
     return;
   }
   header("Aerial view", "");
@@ -201,9 +206,10 @@ async function runBriefing(ctx) {
   header("Video briefing", "");
   const status = (text) => {
     if (mine !== token) return;
-    el.innerHTML = `<div class="media-status"><div class="spinner" aria-hidden="true"></div>
+    // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+    setHtml(el, `<div class="media-status"><div class="spinner" aria-hidden="true"></div>
       <span>${esc(text)}</span><small>The script is written from your report, word for word, and
-      read aloud by an AI voice. The pictures are AI illustrations of generic places.</small></div>`;
+      read aloud by an AI voice. The pictures are AI illustrations of generic places.</small></div>`);
   };
   status("Writing the script from your report…");
   $("#briefingBtn").disabled = true;
@@ -228,12 +234,14 @@ async function runBriefing(ctx) {
     const res = job.result;
     const name = `previous-ai-briefing-${String(res.place || "home").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "")}.mp4`;
     header("Video briefing", "");
-    $("#mediaSource").innerHTML = `${res.narrated ? "" : "Silent version · "}<a class="text-link"
-      href="${esc(res.video)}" download="${esc(name)}">Download · ${Math.round(res.duration_s)} s</a>`;
+    // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+    setHtml($("#mediaSource"), `${res.narrated ? "" : "Silent version · "}<a class="text-link"
+      href="${esc(res.video)}" download="${esc(name)}">Download · ${Math.round(res.duration_s)} s</a>`);
     $("#mediaSource").hidden = false;
-    el.innerHTML = `
+    // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+    setHtml(el, `
       <video class="media-fill contain" controls autoplay playsinline preload="auto" src="${esc(res.video)}"
-        aria-label="Video briefing of this report"></video>`;
+        aria-label="Video briefing of this report"></video>`);
   } catch (err) {
     if (mine !== token) return;
     // Recommended by Norma — fixed with Claude Opus 5 via Claude Code

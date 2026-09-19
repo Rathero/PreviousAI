@@ -156,8 +156,10 @@ def _by_year(rows) -> dict[int, dict]:
 
 
 def _git(target: Path, *args: str) -> str:
+    # Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+    # A stalled git raises TimeoutExpired, and the gate records a check that could not run.
     return subprocess.run(["git", "-C", str(target), *args], capture_output=True, text=True,
-                          check=True, encoding="utf-8").stdout
+                          check=True, encoding="utf-8", timeout=120).stdout
 
 
 # --------------------------------------------------------------------------- #

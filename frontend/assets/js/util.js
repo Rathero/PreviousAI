@@ -39,7 +39,13 @@ export const store = {
     } catch (_) { return fallback; }
   },
   set(key, value) {
-    try { window.localStorage.setItem(key, JSON.stringify(value)); } catch (_) { /* ignore */ }
+    try {
+      window.localStorage.setItem(key, JSON.stringify(value));
+    } catch (err) {
+      // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+      // Still never breaks the page, but a save that fails is no longer silent.
+      console.warn("Could not save to this browser's storage:", err);
+    }
   },
 };
 
