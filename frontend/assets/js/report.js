@@ -428,17 +428,21 @@ function moneyHtml(key) {
     <button type="button" class="money" data-grants-open="${esc(key || "all")}">
       <span class="money-icon" aria-hidden="true">€</span>
       <span class="money-text">${esc(text)}</span>
-      <span class="money-go">See which →</span>
+      <span class="money-go" aria-hidden="true">→</span>
     </button>`;
 }
 
+// Under the steps, in the plan's column: it pays for them, and it takes no height from the
+// story beside it.
 function addMoney(el, risk) {
   if (el.dataset.view === "calm") return;
-  el.insertAdjacentHTML("beforeend", moneyHtml(risk ? risk.key : null));
+  const cols = el.querySelectorAll(":scope > .col");
+  (cols[cols.length - 1] || el).insertAdjacentHTML("beforeend", moneyHtml(risk ? risk.key : null));
 }
 
 function grantHtml(item) {
-  const dots = (item.families || []).map((f) =>
+  const relevant = grants().families || {};
+  const dots = (item.families || []).filter((f) => relevant[f]).map((f) =>
     `<span class="dot" data-family="${esc(f)}" title="${esc(NAMES[f] || f)}"></span>`).join("");
   return `
     <article class="grant">
@@ -460,7 +464,8 @@ function grantHtml(item) {
 
 function renderGrants() {
   const g = grants();
-  const families = ORDER.filter((k) => grantsFor(k).length);
+  // Only the risks that matter at this home get a tab.
+  const families = ORDER.filter((k) => (g.families || {})[k] && grantsFor(k).length);
   if (grantsFamily !== "all" && !families.includes(grantsFamily)) grantsFamily = "all";
   const tabs = ["all", ...families].map((k) => `
     <button type="button" class="tab" role="tab" data-grants-family="${esc(k)}" aria-selected="${k === grantsFamily}">
@@ -477,10 +482,16 @@ function renderGrants() {
         <div class="grant-list">${items.map(grantHtml).join("")}</div>
       </section>`;
   }).join("");
+  // What does not exist here, said as plainly as what does.
+  const gaps = (grantsFamily === "all" ? ORDER : [grantsFamily]).flatMap((k) =>
+    (((g.families || {})[k] || {}).gaps || []).map((text) =>
+      `<li><span class="dot" data-family="${esc(k)}" aria-hidden="true"></span><span>${esc(text)}</span></li>`));
   $("#grants").innerHTML = `
     ${g.intro ? `<p class="plan-note">${esc(g.intro)}</p>` : ""}
     ${families.length > 1 ? `<div class="tabs" role="tablist" aria-label="Risks">${tabs}</div>` : ""}
     ${groups || `<p class="muted">No public programme for this risk here yet.</p>`}
+    ${gaps.length ? `<section class="grant-group"><h3>Not available here</h3>
+      <ul class="grant-gaps">${gaps.join("")}</ul></section>` : ""}
     ${g.note ? `<p class="plan-fine">${esc(g.note)}</p>` : ""}`;
 }
 

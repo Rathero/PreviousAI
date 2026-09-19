@@ -28,6 +28,15 @@ score.
 - **PDF report** to keep and share: the pictures of the home, every value behind each
   score with its period and source, what already happened, the climate to 2050, the full
   action plan with its partners and the sources. On a phone it opens the share sheet.
+- **Today / 2050**: the same four risks around 2050, as the change in what drives each one
+  (days of high fire danger, rain on the wettest day, hot days and tropical nights) from
+  the climate projections, carried onto today's record. Scores, official maps and past
+  events describe today and are not projected; the 2050 view says so instead of inventing
+  a score.
+- **Public money**: grants, tax deductions and public cover that can pay for part of the
+  plan (checked against the official pages, with amounts, deadlines and who applies: the
+  household, the owners' association, the town hall, or anyone after damage), and what
+  does not exist here, said as plainly.
 
 The app is public: no sign-up and no login.
 
@@ -62,6 +71,8 @@ backend/app/         FastAPI API and the report engine
   products.py        The real products the plan proposes: store, link, photo, price
   dwelling.py        House or flat, and the floor: who acts, what the water means
   protection.py      The measure catalogue (costs, standards, official programmes)
+  grants.py          Public money for the home: the checked catalogue and who applies
+  ahead.py           The 2050 view: each risk's drivers from the climate projections
   media.py           The fal.ai illustration library, picked by each card's value
   briefing.py        The narrated video briefing (script written by code)
   pdf_report.py      The report as a PDF (ReportLab), with the pictures of the home

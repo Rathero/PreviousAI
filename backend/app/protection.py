@@ -98,9 +98,9 @@ SOURCES = {
     "acna": ("ACNA, avalanche terrain safety courses (STA)", "https://www.acna.cat/"),
     "rescue_costs": ("Intermundial, what a mountain insurance covers (rescue costs in Spain)",
                      "https://www.intermundial.es/blog/seguro-deportes-riesgo-rescate-montana"),
-    "irpf": ("Spanish income-tax deductions for energy-efficiency works, extended to 2026 "
-             "(Royal Decree-law 16/2025)",
-             "https://www.ocu.org/fincas-y-casas/gestion/fiscalidad/analisis/2026/01/deducciones-irpf-eficiencia-2026"),
+    "irpf": ("Spanish income-tax deductions for energy-efficiency works (Law 35/2006, additional "
+             "provision 50, as worded by Royal Decree-law 7/2026)",
+             "https://www.boe.es/buscar/act.php?id=BOE-A-2006-20764"),
     "bcn_shelters": ("Barcelona climate shelters network", "https://www.barcelona.cat/"
                      "barcelona-pel-clima/en/specific-actions/climate-shelters-network"),
     "who_heat": ("WHO Europe, staying safe in the heat: health advice (2022)",
@@ -121,7 +121,7 @@ PARTNERS = {
             "url": "https://www.consorseguros.es/"},
     "rd_590": {"name": "MITECO flood-adaptation grants (DANA municipalities)", "kind": "public",
                "scope": "ES", "status": "official",
-               "offer": "Barriers, backflow valves and pumps, works since 30 Oct 2024 eligible",
+               "offer": "Paid to the town halls of the 62 DANA municipalities, which can open calls for owners",
                "url": "https://www.boe.es/diario_boe/txt.php?id=BOE-A-2026-15458"},
     "miteco_guides": {"name": "MITECO flood-adaptation guides", "kind": "public", "scope": "ES",
                       "status": "official", "offer": "Free guides for owners, with measures by building type",
@@ -147,7 +147,9 @@ PARTNERS = {
                "status": "official", "offer": "Aran's avalanche bulletin and awareness talks",
                "url": "http://lauegi.conselharan.org/training-and-awareness/?lang=en"},
     "aemet_bpa": {"name": "AEMET avalanche bulletins", "kind": "public", "scope": "ES",
-                  "status": "official", "offer": "Navarre and Aragon Pyrenees, and the Picos de Europa",
+                  "status": "official",
+                  "offer": "Pyrenees (Catalan side included) and Picos de Europa; weekly for Guadarrama and "
+                           "Cordel-Peña Labra",
                   "url": "https://www.aemet.es/en/eltiempo/prediccion/montana/boletin_peligro_aludes"},
     "eaws": {"name": "European Avalanche Warning Services", "kind": "public", "scope": "ALL",
              "status": "official", "offer": "Links to every European avalanche bulletin",
@@ -163,7 +165,7 @@ PARTNERS = {
                         "url": "https://web.gencat.cat/ca/inici/actualitat/estiu/refugis-climatics"},
     "irpf": {"name": "Income-tax deductions for energy-efficiency works", "kind": "public",
              "scope": "ES", "status": "official",
-             "offer": "20 %, 40 % or 60 % of the cost, with energy certificates, to 31 Dec 2026",
+             "offer": "20 % or 40 % of the cost to 31 Dec 2026; 60 % for whole-building works to 31 Dec 2027",
              "url": SOURCES["irpf"][1]},
     # Retail ------------------------------------------------------------------
     "leroy_merlin": {"name": "Leroy Merlin", "kind": "retailer", "scope": "ES", "status": "example",
@@ -360,9 +362,10 @@ MEASURES = [
        modes=TRAVEL, cost="from a few euros a day", band=1, impact="medium", triggers={"*": 40},
        scope="ES", partners=["heymondo", "intermundial_travel"], slot="Travel insurer"),
     _m("flood_grants", "flood", "public", "Check for flood-adaptation grants",
-       "Spain funds barriers, backflow valves and pumps in the 62 municipalities hit by the "
-       "2024 DANA (works since 30 October 2024 count), and runs pilot programmes on the middle "
-       "Ebro and the lower Segura. Elsewhere, ask the town hall and the regional government.",
+       "Spain's flood-adaptation grants (Royal Decree 590/2026) go to the town halls of the 62 "
+       "municipalities hit by the 2024 DANA, which can open calls for owners; works since 30 "
+       "October 2024 count. Elsewhere, ask the town hall and the regional government, and "
+       "remember that renovation works pay 10 % VAT instead of 21 %.",
        cost="grant", band=0, impact="medium", triggers={"flood_zone": 40},
        scope="ES", partners=["rd_590"], source="rd_590"),
     _m("flood_guide", "flood", "public", "Read the official guide for owners",
@@ -595,8 +598,9 @@ MEASURES = [
        scope="ES", profiles=["older_adults", "pregnancy"], partners=["heymondo", "intermundial_travel"],
        slot="Travel insurer"),
     _m("heat_tax", "heat", "public", "Tax deductions for energy-efficiency works",
-       "Works that cut heating and cooling demand can deduct 20 %, 40 % or 60 % of the cost "
-       "from income tax, with energy certificates before and after, until 31 December 2026.",
+       "Works that cut heating and cooling demand can deduct 20 % or 40 % of the cost from "
+       "income tax until 31 December 2026, and works on the whole building 60 % until 31 "
+       "December 2027, with energy certificates before and after.",
        cost="deduction", band=0, impact="medium", triggers={"heat": 50}, scope="ES",
        partners=["irpf"], source="irpf"),
 ]
