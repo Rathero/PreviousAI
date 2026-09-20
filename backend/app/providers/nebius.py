@@ -36,17 +36,43 @@ TOP_LOGPROBS = 20  # the API's maximum
 CONCURRENCY = 6  # a claim check sends one call per sentence; the base limit is 60 a minute
 PRICES_TTL_S = 24 * 3600
 # Bump when the prompt changes: cached answers were given to the old one.
-PROMPT_VERSION = 1
+PROMPT_VERSION = 2  # Recommended by Norma — fixed with Claude Opus 5 via Claude Code
 
+# Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+# On the suggested "unknown" value / error object: the reply is already pinned to the
+# listed options by the strict JSON schema `_prompt` builds, and `_answers` refuses
+# anything else, so neither would ever reach a caller. Uncertainty has its own channel
+# here: `_distribution` reads it from the token log-probabilities. So the prompt says
+# what to do with a thin STATE (answer anyway, from the evidence there is) instead of
+# offering a way out of the schema, and says it in the positive.
 SYSTEM = (
-    "You answer questions about a STATE, a JSON object describing a situation. Use only "
-    "the STATE and plain common sense; never invent facts. Each question has an id.\n"
+    "You answer questions about a STATE, a JSON object describing a situation. Answer "
+    "strictly from what the STATE says plus ordinary common sense. Each question has an "
+    "id.\n"
     "- A choice question lists its options: answer with the exact option, copied "
     "character for character.\n"
     "- A yes/no question states something: answer \"yes\" if it is true of the STATE, "
     "\"no\" if it is not.\n"
-    "Reply with one JSON object that has every question id as a key, in the order given, "
-    "and the answer as its value. Nothing else."
+    "- Answer every question, including the ones the STATE leaves open: pick the listed "
+    "option its evidence best supports. How sure you are is read from your own token "
+    "probabilities, so a close call needs no hedging. When a field is missing or "
+    "unreadable, treat it as absent and answer from what remains.\n"
+    "- Every value is one short string, an option or \"yes\"/\"no\": no explanation, no "
+    "units, no other text. Keep a flat, machine-readable register.\n"
+    "Reply with exactly one JSON object that has every question id as a key, in the "
+    "order given, and the answer as its value.\n"
+    "\n"
+    "Worked example, in the shape every call arrives in. For the STATE\n"
+    "{\"room\": {\"windows\": 0, \"lamps\": 2}}\n"
+    "and the questions\n"
+    "[light] choice: how the room is lit\n"
+    "  Options:\n"
+    "  - \"daylight\"\n"
+    "  - \"artificial\"\n"
+    "  - \"mixed\"\n"
+    "[is_dark] yes/no: the room has no light at all\n"
+    "the whole reply is\n"
+    "{\"light\": \"artificial\", \"is_dark\": \"no\"}"
 )
 
 _semaphore: asyncio.Semaphore | None = None

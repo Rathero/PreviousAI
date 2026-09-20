@@ -34,3 +34,17 @@ data/cds/pending.json
 
 # Autonomous layer runtime state (run records in data/autonomy/runs/ are kept).
 data/autonomy/queue.json
+
+# The evaluation knowledge base: rebuilt from the reports and the catalogues by
+# backend/scripts/galtea_kb.py, and dated by the reports it was built from.
+data/galtea/
+
+# The evaluation platform key (never committed; see backend/scripts/galtea_eval.py).
+.env.local
+
+# What the national analysis downloaded to build itself: the cadastre's province feeds
+# and building zips, and the official flood polygons per municipality. 2.6 GB for the
+# thirty towns built so far, and re-downloadable by analysis_build.py. The BUILT files
+# (municipalities.json.gz, ranking.json.gz, exposure/*.json.gz) are small and are kept:
+# they are the ranking, and it has to be the same list for everyone.
+data/analysis/raw/

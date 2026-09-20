@@ -96,6 +96,23 @@
         "8005"
       ],
       "port": 8005
+    },
+    {
+      "name": "previous-ai-8006",
+      "runtimeExecutable": ".venv/Scripts/python.exe",
+      "runtimeArgs": [
+        "-m",
+        "uvicorn",
+        "app.main:app",
+        "--app-dir",
+        "backend",
+        "--port",
+        "8006",
+        "--reload",
+        "--reload-dir",
+        "backend"
+      ],
+      "port": 8006
     }
   ]
 }

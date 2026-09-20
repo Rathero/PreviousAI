@@ -38,6 +38,11 @@ score.
   household, the owners' association, the town hall, or anyone after damage), and what
   does not exist here, said as plainly.
 
+- **The same thing backwards** (`/analisis`): every municipality of Spain ranked against
+  the same data, and inside the ones already crossed with the official flood maps, the
+  buildings that stand in them — how many dwellings, how old — each one a link to its own
+  report. For whoever has to reach the homes rather than live in one.
+
 The app is public: no sign-up and no login.
 
 ## Run it
@@ -59,7 +64,7 @@ On macOS or Linux use `.venv/bin/python` instead of `.venv/Scripts/python.exe`.
 ## How it works
 
 ```
-frontend/            The web app: two views, no build step (ES modules, Leaflet)
+frontend/            The web app: three views, no build step (ES modules, Leaflet)
 backend/app/         FastAPI API and the report engine
   report.py          Orchestrates a report: location, sources in parallel, cards, extras
   hazards*.py        Climate cards (ERA5), official cards (MITECO, IGN, ICGC, AGORA,
@@ -79,6 +84,8 @@ backend/app/         FastAPI API and the report engine
   view.py            The report as the web app shows it (headline, facts, stories)
   simulations.py     The four hazards drawn by AI on a photo of a demo home's street
   demo.py            The demo homes, answered from packs built ahead of time
+  analysis.py        The report backwards: every municipality ranked, then its buildings
+  spatial.py         Point-in-polygon for thousands of points against one big polygon set
   providers/         One module per external service
 backend/scripts/     Batch pipelines: cache warm-up, Catalan layers, Copernicus CDS,
                      fal.ai library, Devin runs
@@ -115,6 +122,47 @@ live path.
 Google's terms do not allow the street-level picture of the home to be stored, so that
 one picture, and the map tiles, are still fetched while the page opens.
 
+### Which homes this threatens (`/analisis`)
+
+The report asks one address what threatens it. `/analisis` asks the country the opposite
+question — which homes are threatened — because a town hall, a comarca or an emergency
+service cannot type eight thousand addresses, and the households who most need a report
+are the ones who will never go looking for one. It is the same engine and the same
+scales at two other units:
+
+- **Municipality.** All **7,597** of the cadastre of common regime, ranked. What can be
+  known for every town at once: the official EURO-CORDEX fire-danger grid at its centre,
+  and in Catalonia the flood episodes, burnt area and avalanche zones already on disk for
+  the reports.
+- **Building.** For the municipalities the batch has been pointed at, every cadastral
+  footprint crossed with the five official SNCZI flood zones — the same question
+  `providers/miteco.py` asks for one point, asked once per building. It answers with the
+  count of exposed buildings, the dwellings inside them and how many were raised before
+  1980, and every row links to that building's own report.
+
+```bash
+python backend/scripts/analysis_build.py --only universe    # who exists, from the cadastre
+python backend/scripts/analysis_build.py --only climate     # the fire-danger grid, offline
+python backend/scripts/analysis_build.py --only catalonia   # the Catalan layers
+python backend/scripts/analysis_build.py --only exposure --municipality 46188
+python backend/scripts/analysis_build.py --only ranking     # assemble
+```
+
+Nothing is computed on the request path: the build writes `data/analysis/` and the API
+only reads it, so two people opening the same ranking see the same list. What cannot be
+known for every town says so instead of scoring low — heat is filled in only where the
+rate-limited climate record allowed it, the flood column exists only where the buildings
+have been counted, and the Basque provinces and Navarre are absent because they keep
+their own cadastre.
+
+Two scales are its own, and they are in `scoring.py` with the rest: `fire_weather_fwi`
+(days a year with FWI > 30, a laxer threshold than the report's 30-30-30 rule, so a
+separate scale) and the municipal flood reading, where the worst zone sets a ceiling and
+the share of the town standing in it decides how much of that ceiling the town gets.
+
+It ranks buildings, never people. The unit is a cadastral footprint and what the cadastre
+publishes about it — year, use, dwellings, floor area. Who lives in it is not in here.
+
 ### Scores
 
 Each risk is the worst of its cards, 0–100: very low < 20 ≤ low < 40 ≤ moderate < 60 ≤
@@ -128,6 +176,9 @@ hazard belongs to the place.
 |---|---|
 | `GET /api/report?address=&home=house\|apartment&floor=&who=` | The web app's report |
 | `GET /api/report/pdf?address=&home=&floor=&who=` | The same report as a PDF, drawn on request |
+| `GET /api/analysis/ranking?hazard=&province=&q=&exposed=&limit=&offset=` | Every municipality, ranked |
+| `GET /api/analysis/municipality/{code}` | One municipality: its scores, their sources, its exposure |
+| `GET /api/analysis/buildings/{code}?zone=` | Its buildings inside an official flood zone |
 | `GET /api/risk?q=` (or `ask=`, or `lat=&lon=`) | The full report, every indicator and its provenance, map layers, forecast |
 | `GET /api/suggest?q=` | Address suggestions while typing (Spain) |
 | `GET /api/locate?q=` | The point an address resolves to |

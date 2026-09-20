@@ -35,6 +35,12 @@ export const api = {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
   }),
   briefingStatus: (id) => request(`/api/briefing/${encodeURIComponent(id)}`),
+  // The national analysis: the ranking, one municipality, and its exposed buildings.
+  analysisRanking: (params, signal) => request(`/api/analysis/ranking?${qs(params)}`, { signal }),
+  analysisMunicipality: (code, signal) =>
+    request(`/api/analysis/municipality/${encodeURIComponent(code)}`, { signal }),
+  analysisBuildings: (code, params, signal) =>
+    request(`/api/analysis/buildings/${encodeURIComponent(code)}?${qs(params)}`, { signal }),
   // The PDF comes back as a file, not JSON: the raw response, or a readable error.
   reportPdf: async (params) => {
     let resp;
