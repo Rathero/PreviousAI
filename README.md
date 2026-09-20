@@ -152,10 +152,21 @@ scales at two other units:
 python backend/scripts/analysis_build.py --only universe    # who exists, from the cadastre
 python backend/scripts/analysis_build.py --only climate     # the fire-danger grid, offline
 python backend/scripts/analysis_build.py --only catalonia   # the Catalan layers
-python backend/scripts/analysis_build.py --only exposure --municipality 46188
+python backend/scripts/analysis_build.py --only screen      # who has any flood zone at all
+python backend/scripts/analysis_build.py --only exposure --per-province 10
 python backend/scripts/analysis_build.py --only assets      # who is inside (TALAIA)
 python backend/scripts/analysis_build.py --only ranking     # assemble
 ```
+
+**Why the flood column is not everywhere.** Counting a town's buildings against the
+official maps costs a cadastre download and five flood-polygon downloads: 23 seconds and
+90 MB for one municipality, and therefore **48 hours and 0.7 TB** for all 7,597, against
+two public government servers. So the expensive step is aimed, not sprayed. `--only
+screen` asks the same WFS for a **count only** (`resultType=hits`: 510 bytes, a tenth of
+a second) and answers, for every town in Spain in 66 minutes, whether any official flood
+zone reaches it at all — **2,434 of them, a third of the country, have none**, which is an
+answer rather than a gap and is shown as one. `--only exposure --per-province 10` then
+spends the expensive step on the ten most flood-mapped towns of each province.
 
 Nothing is computed on the request path: the build writes `data/analysis/` and the API
 only reads it, so two people opening the same ranking see the same list. What cannot be

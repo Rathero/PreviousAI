@@ -14,6 +14,9 @@ async function request(url, options = {}) {
     const detail = body && (typeof body.detail === "string" ? body.detail : null);
     const error = new Error(detail || `The server answered ${resp.status}.`);
     error.status = resp.status;
+    // Kept apart from `message`: the backend's own sentence is written for the reader,
+    // the fallback above is not, and only the first is worth putting on the page.
+    error.detail = detail;
     throw error;
   }
   return body;

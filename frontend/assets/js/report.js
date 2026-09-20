@@ -179,6 +179,7 @@ function stopProgress() {
 function heroLoading() {
   stopProgress();
   let i = 0;
+  $("#heroGap").hidden = true;
   $("#heroTitle").textContent = "Checking flood, fire, avalanche and heat data for your area…";
   $("#heroText").textContent = PROGRESS[0];
   progressTimer = setInterval(() => {
@@ -187,16 +188,28 @@ function heroLoading() {
   }, 3200);
 }
 
+// A source that did not answer leaves risks unmeasured. Saying so under the headline is
+// the whole point: an empty tile the reader takes for a calm one is worse than no tile.
+function gapLine(partial) {
+  if (!partial) return "";
+  const again = partial.retry ? ` We can analyse them again ${partial.retry}.` : "";
+  return `${partial.note}${again}`;
+}
+
 function renderHero() {
   stopProgress();
   const head = horizon === "2050" && data.ahead ? data.ahead
     : horizon === "before" && data.past ? data.past : data.headline;
   $("#heroTitle").textContent = head.title;
   $("#heroText").textContent = head.text;
+  const gap = gapLine(data.partial);
+  $("#heroGap").textContent = gap;
+  $("#heroGap").hidden = !gap;
 }
 
 function heroError(message) {
   stopProgress();
+  $("#heroGap").hidden = true;
   $("#heroTitle").textContent = "We could not analyse this address.";
   // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
   setHtml($("#heroText"), `${esc(message)} <a class="text-link"
@@ -219,9 +232,13 @@ function tileHtml(key, risk) {
   const score = risk ? risk.score : null;
   const value = score == null ? "—" : `${score}%`;
   const dim = !loading && !risk.worth;
-  const fact = loading ? '<span class="skeleton-line"></span>' : !dim && risk.fact ? esc(risk.fact) : "";
+  // An unmeasured risk keeps its line even while dimmed: "—" on its own reads as a zero.
+  const gap = !loading && risk.unavailable;
+  const fact = loading ? '<span class="skeleton-line"></span>'
+    : gap ? "No data for this address today."
+    : !dim && risk.fact ? esc(risk.fact) : "";
   return `
-    <button type="button" class="tile${dim ? " dim" : ""}${loading ? " loading" : ""}" data-family="${key}"
+    <button type="button" class="tile${dim ? " dim" : ""}${gap ? " gap" : ""}${loading ? " loading" : ""}" data-family="${key}"
       style="--grow:${grow(risk)}" aria-pressed="${active === key}"${loading ? " disabled" : ""}>
       <span class="tile-name"><span class="tile-dot" aria-hidden="true"></span>${NAMES[key]}</span>
       ${fact ? `<span class="tile-fact">${fact}</span>` : ""}
@@ -1175,8 +1192,9 @@ async function loadReport({ keep = false } = {}) {
     preloadBriefing();
   } catch (err) {
     if (err.name === "AbortError" || mine !== token) return;
-    heroError(err.status === 404 ? err.message
-      : "Our data sources are busy right now. Please try again in a few minutes.");
+    // The backend's own sentence when it wrote one: it knows whether the wait is minutes
+    // or until tomorrow, and sending someone back too early is the same failure twice.
+    heroError(err.detail || "Our data sources are busy right now. Please try again in a few minutes.");
     $("#tiles").innerHTML = "";
     $("#heroControls").hidden = true;
     $("#detail").dataset.view = "empty";

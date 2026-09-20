@@ -268,9 +268,16 @@ function note(meta) {
     + (missing ? ` The Basque provinces and Navarre are not here: ${esc(missing.reason)}.` : "")
     // The column is only as good as the mapping under it, and saying so is the
     // difference between a tool and a false reassurance.
+    + ` Of the ${fmt(meta.screened)} towns asked, ${fmt(meta.screened_dry)} have no `
+    + `official flood zone over them at all, and say so rather than showing a gap.`
     + ` And a low flood column is not a safe town: the official zones are studies of `
     + `mapped watercourses. Paiporta's urban area is classed T500 and Picanya has two `
-    + `buildings mapped at all — both were flooded in October 2024.`;
+    + `buildings mapped at all — both were flooded in October 2024.`
+    // The inventory is not evenly good across Spain, and a column that looks
+    // comparable but is not is worse than one that admits it.
+    + ` The inventory of schools, care homes and the rest is thinner outside Catalonia, `
+    + `whose registers feed it directly: Girona returns 1,068 places and Écija 29 for a `
+    + `town of the same size. Read those counts within a region, not across them.`;
 }
 
 function renderHazards() {
@@ -339,6 +346,8 @@ function detailHtml(m) {
     </div>`;
 
   const exp = m.exposure && m.exposure.flood ? m.exposure : null;
+  const screened = m.flood_screen_rank !== null && m.flood_screen_rank !== undefined;
+  const dry = screened && m.flood_screen_rank === 0;
   const exposure = exp ? `
     <section class="an-sec">
       <h3>The buildings that stand in an official flood zone</h3>
@@ -359,14 +368,29 @@ function detailHtml(m) {
       <button type="button" class="chip-btn solid" id="anBuildings"
               data-code="${esc(m.code)}">See the buildings →</button>
       <div class="an-buildings" id="anBuildingList"></div>
+    </section>` : dry ? `
+    <section class="an-sec">
+      <h3>Nothing is mapped over this town</h3>
+      <p class="an-secsub">
+        Asked of the official flood mapping: not one zone of any return period —
+        preferential flow, T100 or T500 — reaches this municipality. So there are no
+        buildings to count, and this is the answer rather than a gap.
+        It is the mapping's answer, not a promise: SNCZI studies mapped watercourses,
+        and a dry ravine that has never been studied is absent from it too.
+      </p>
     </section>` : `
     <section class="an-sec">
-      <h3>The buildings have not been counted here yet</h3>
+      <h3>${screened
+        ? `Flood zones do reach this town — the buildings are not counted yet`
+        : `The buildings have not been counted here yet`}</h3>
       <p class="an-secsub">
-        Crossing this town's cadastral footprints with the official flood maps is a
-        batch job: <code>analysis_build.py --only exposure --municipality ${esc(m.code)}</code>.
-        Until it runs, this municipality has no flood column, and the ranking says so
-        rather than assuming it is dry.
+        ${screened ? `The screen found ${fmt(m.flood_screen.zfp)} preferential-flow,
+          ${fmt(m.flood_screen.t100)} T100 and ${fmt(m.flood_screen.t500)} T500 polygons
+          touching it, which is why it is not shown as dry. ` : ""}
+        Crossing this town's cadastral footprints with those maps is the expensive step:
+        <code>analysis_build.py --only exposure --municipality ${esc(m.code)}</code>.
+        Until it runs there is no flood column here, and the ranking says so rather than
+        assuming a zero.
       </p>
     </section>`;
 
@@ -469,9 +493,11 @@ function assetsHtml(exp) {
     <section class="an-sec">
       <h3>Who and what is inside</h3>
       <p class="an-secsub">
-        Over the ${fmt(a.aoi.km2, 1)} km² around the buildings that stand in a flood zone:
-        <strong>${fmt(Math.round(a.population_resident))} residents</strong>,
-        ${fmt(a.count)} assets of which <strong>${fmt(inside.count)}</strong> fall inside a
+        ${a.population_in_zone !== null && a.population_in_zone !== undefined
+          ? `An estimated <strong>${fmt(a.population_in_zone)} residents</strong> live on the
+             ground that floods. ` : ""}
+        Over the ${fmt(a.aoi.km2, 1)} km² asked about, ${fmt(a.count)} assets, of which
+        <strong>${fmt(inside.count)}</strong> fall inside a
         zone${inside.people ? `, holding ${fmt(inside.people)} people at capacity` : ""}${
           a.hazardous ? `, and ${fmt(a.hazardous)} hazardous sites` : ""}.
         ${inside.value_eur ? `Replacement value inside a zone: ${eur(inside.value_eur)}.` : ""}
@@ -484,9 +510,16 @@ function assetsHtml(exp) {
             c.total_value_eur ? ` · ${eur(c.total_value_eur)}` : ""}</span>
         </div>`).join("")}</div>` : ""}
       ${items ? `<div class="an-blist">${items}</div>` : ""}
-      <p class="an-secsub an-caveat">Population is the census grid apportioned to that
-        area, not a count of who is in those buildings, and the valuation is modelled
-        from class defaults, not surveyed. None of it changes a score.</p>
+      <p class="an-secsub an-caveat">The population is the 1 km census grid apportioned
+        by where the flooded dwellings are — ${a.persons_per_dwelling !== null
+          && a.persons_per_dwelling !== undefined
+          ? `${fmt(a.persons_per_dwelling, 1)} residents per flooded dwelling here` : "an estimate"}${
+          a.population_cells_clamped
+            ? `, and ${fmt(a.population_cells_clamped)} of ${fmt(a.population_cells)} census
+               cells reach into a denser neighbour, so their ratio was held in band and this
+               is an upper bound` : ""}. It is not a count of who is in those buildings.
+        The valuation is modelled from class defaults, not surveyed, and capacity is what
+        a place holds when full. None of it changes a score.</p>
     </section>`;
 }
 

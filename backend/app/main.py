@@ -175,7 +175,22 @@ async def _home_report(address: str, home: str | None, floor: str | None, who: s
     except geocoding.GeocodingError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except (RuntimeError, ValueError) as exc:
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
+        raise HTTPException(status_code=502, detail=_busy_message(str(exc))) from exc
+
+
+def _busy_message(reason: str) -> str:
+    """What to tell someone whose report could not be built at all.
+
+    The timing has to match the reason: Open-Meteo's daily limit does not clear for
+    hours, and "try again in a few minutes" only sends the reader back to the same empty
+    page. A report that lost part of its sources never reaches here: it comes out with
+    what was measured, saying what is missing (report.py).
+    """
+    if "daily" in reason.lower():
+        return ("Our climate data source has reached its daily request limit. Addresses "
+                "already analysed still open normally, and this one can be analysed "
+                "again tomorrow.")
+    return "Our data sources are busy right now. Please try again in a few minutes."
 
 
 @app.get("/api/report/pdf")

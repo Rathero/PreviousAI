@@ -199,27 +199,37 @@ async def build_report(
             data["snow"] = exc
 
     archive = data["archive"]
+    # The climate record empties three cards, and nothing else. It is not a reason to
+    # answer nothing: the flood maps, the official records and the avalanche layer are
+    # already here, and they are the most local part of the report. What is missing is
+    # named as missing, never scored as calm.
+    climate_gap = None
     if isinstance(archive, Exception):
-        raise RuntimeError(f"could not get the ERA5 climate record: {archive}")
+        climate_gap = str(archive)
+        archive = {}
+        warnings.append(f"The ERA5 climate record could not be obtained ({climate_gap}). "
+                        f"Heat, rain and fire weather are missing below: they are unknown "
+                        f"here, not low. Everything else was measured as usual.")
 
     if archive.get("_stale"):
         last_day = (archive.get("daily", {}).get("time") or ["?"])[-1]
-        near = archive.get("_nearby")
-        where = (f"for a nearby point ({near['distance_km']} km away, same ~9 km grid)"
-                 if near else "for this point")
         warnings.append(f"Open-Meteo did not respond (request limit or network): using the "
-                        f"saved ERA5 record {where}, which runs until {last_day}.")
+                        f"saved ERA5 record {_borrowed_from(archive)}, which runs until "
+                        f"{last_day}.")
 
     # 3. Series ------------------------------------------------------------------------
-    full_all = _add_derived(S.DailySeries.from_open_meteo(archive))
-    full = full_all.subset(months=months)
-    recent = full.subset(min_year=config.CLIMATOLOGY_START)
-    if len(recent) < 365:
-        recent = full
-        warnings.append("Short climatological window; the whole available record is used.")
+    if climate_gap:
+        full_all = full = recent = S.DailySeries(dates=[], vars={})
+    else:
+        full_all = _add_derived(S.DailySeries.from_open_meteo(archive))
+        full = full_all.subset(months=months)
+        recent = full.subset(min_year=config.CLIMATOLOGY_START)
+        if len(recent) < 365:
+            recent = full
+            warnings.append("Short climatological window; the whole available record is used.")
 
     # 4. Hazards -----------------------------------------------------------------------
-    hazard_list = [
+    hazard_list = [] if climate_gap else [
         HZ.hazard_heat(recent, full, months),
         HZ.hazard_rain(recent, full),
         HZ.hazard_wildfire(recent, full, months),
@@ -298,11 +308,16 @@ async def build_report(
             for f in fires_record["fires"][:6]]
 
     hazard_list.sort(key=lambda h: -(h.score or 0))
+    # A report with no card at all says nothing worth showing: that is the only case
+    # still worth an error rather than a page.
+    if not hazard_list:
+        raise RuntimeError(f"no hazard could be built for this point "
+                           f"({climate_gap or 'every source failed'})")
     overall = scoring.aggregate([h.score for h in hazard_list])
 
     # 6. Cross-check against the Copernicus CDS baseline, over the SAME years in both
     # layers (a "verified" badge that compares different periods would lie).
-    cell = cds_baseline.nearest_cell(lat_f, lon_f)
+    cell = cds_baseline.nearest_cell(lat_f, lon_f) if not climate_gap else None
     verification = None
     if cell:
         matched = _matched_window(full_all, None, cell["baseline"].get("period"))
@@ -329,19 +344,23 @@ async def build_report(
         "mode": mode,
         "window": {
             "months": sorted(months) if months else list(range(1, 13)),
-            "climatology": f"{recent.year_range[0]}-{recent.year_range[1]}",
-            "full_record": f"{full.year_range[0]}-{full.year_range[1]}",
+            "climatology": None if climate_gap else f"{recent.year_range[0]}-{recent.year_range[1]}",
+            "full_record": None if climate_gap else f"{full.year_range[0]}-{full.year_range[1]}",
             "days_analysed": len(full),
         },
         "overall": {
             "score": overall,
             "level": scoring.level_for(overall),
+            # A partial score is a floor, not a verdict: the missing cards can only push
+            # it up, never down, and the app has to say so rather than round it to calm.
+            "partial": bool(climate_gap),
             "method": "the worst hazard dominates; the next ones add at most 15/7/4 % of the "
                       "remaining headroom (backend/app/scoring.py)",
         },
+        "partial": _partial(climate_gap),
         "hazards": [h.to_dict() for h in hazard_list],
         "projection": projection,
-        "events": {**_events(full_all, months), **official_events},
+        "events": {**({} if climate_gap else _events(full_all, months)), **official_events},
         "coverage": coverage,
         "regional": HG.regional_table(th),
         "alerts": alerts,
@@ -533,6 +552,51 @@ def _precision_notes(place: dict, lat: float, lon: float) -> list[str]:
                      f"to that point, not to the whole town: give a street and number for "
                      f"your home.")
     return notes
+
+
+# The ERA5-Land grid. Inside half a cell a borrowed series really is the same climate;
+# beyond it, it is a rescue and the report says the distance instead of claiming a grid.
+ERA5_CELL_KM = 9.0
+
+
+def _borrowed_from(archive: dict) -> str:
+    """Where a rescued series comes from, said without flattering it."""
+    near = archive.get("_nearby")
+    if not near:
+        return "for this point"
+    km, dz = near["distance_km"], near.get("height_diff_m")
+    if km <= ERA5_CELL_KM / 2:
+        return f"for a nearby point ({km} km away, same ~9 km grid)"
+    where = f"for the nearest saved point, {km} km away"
+    if dz:
+        where += f" and {abs(dz)} m {'higher' if dz > 0 else 'lower'}"
+    return where
+
+
+# The cards the climate record alone can build. Without it they are missing, and the
+# app must say so: "unknown" and "low" are not the same sentence to live by.
+CLIMATE_CARDS = ("heat", "rain", "wildfire")
+
+
+def _partial(climate_gap: str | None) -> dict | None:
+    """What the report could not measure, named so the app never implies calm instead.
+
+    The retry wording follows the reason: Open-Meteo's per-minute limit clears in
+    minutes, the daily one does not clear until tomorrow, and sending someone back "in a
+    few minutes" for a limit that lasts all day is just the same failure twice.
+    """
+    if not climate_gap:
+        return None
+    low = climate_gap.lower()
+    return {
+        "missing_cards": list(CLIMATE_CARDS),
+        "source": "the ERA5 climate record (Open-Meteo)",
+        "reason": climate_gap,
+        "retry": ("tomorrow" if "daily" in low
+                  else "in a few minutes" if "429" in low or "limit" in low else None),
+        "note": "Heat, rain and fire weather could not be measured for this address: they "
+                "are unknown here, not low.",
+    }
 
 
 def _shared_series_note(archive: dict) -> list[str]:

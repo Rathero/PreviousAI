@@ -307,7 +307,11 @@ def headline(tiles: list[dict]) -> dict:
     scored = sorted((r for r in tiles if r["score"] is not None), key=lambda r: -r["score"])
     worth = [r for r in scored if r["score"] >= WORTH]
     calm = [r for r in scored if r["score"] < WORTH]
+    # "Nothing calls for preparation" is a claim about every risk. With one of them
+    # unmeasured it would be a claim we cannot make, so the headline says what is known.
+    unknown = [r for r in tiles if r.get("unavailable")]
     title = (f"{COUNT_WORDS[len(worth)]} worth preparing for at your home." if worth
+             else "Nothing we could measure here calls for special preparation." if unknown
              else "Nothing here calls for special preparation.")
     groups: list[tuple[str, list[dict]]] = []
     for r in worth:
@@ -319,6 +323,8 @@ def headline(tiles: list[dict]) -> dict:
                  for i, (level, g) in enumerate(groups)]
     if not worth and calm:
         sentences.append(f"{_names(calm)} {_verb(calm)} not a concern here.")
+    if unknown:
+        sentences.append(f"{_names(unknown)} could not be measured for this address.")
     return {"title": title, "text": " ".join(sentences)}
 
 
@@ -334,16 +340,22 @@ def _tile(report: dict, key: str, label: str, family: dict | None) -> dict:
     notes = ((report.get("dwelling") or {}).get("notes") or {})
     ruled_out = bool((family or {}).get("ruled_out"))
     ruled_out_note = ((report.get("coverage") or {}).get("ruled_out") or {}).get(key)
-    score = round(top["score"]) if top else (0 if ruled_out else None)
+    # A source that did not answer is not a risk that does not apply. An empty tile says
+    # which of the two it is, because the reader acts on the difference.
+    missing = set((report.get("partial") or {}).get("missing_cards") or [])
+    unavailable = not cards and bool(missing & set(card_keys))
+    score = round(top["score"]) if top else (0 if ruled_out and not unavailable else None)
     return {
         "key": key,
         "label": label,
         "applies": bool(top),
-        "ruled_out": ruled_out,
+        "unavailable": unavailable,
+        "ruled_out": ruled_out and not unavailable,
         "score": score,
-        "level": top["level"] if top else ("very low" if ruled_out else None),
+        "level": top["level"] if top else ("very low" if ruled_out and not unavailable else None),
         "worth": score is not None and score >= WORTH,
-        "summary": top["headline"] if top else (family or {}).get("note"),
+        "summary": ("We could not measure this one here." if unavailable
+                    else top["headline"] if top else (family or {}).get("note")),
         "fact": _fact(report, key, top, ruled_out_note if ruled_out else None),
         "story_title": STORY_TITLES[key],
         "story": _story(report, key, cards),
@@ -394,6 +406,7 @@ def app_view(report: dict) -> dict:
         "zoom": (report.get("map") or {}).get("zoom"),
         "notes": (report.get("coverage") or {}).get("notes", []),
         "personalization": report.get("personalization"),
+        "partial": report.get("partial"),
         "warnings": report.get("warnings", []),
         "sources": [{"name": s["name"], "url": s.get("url")} for s in report.get("sources", [])],
         "meta": report.get("meta"),

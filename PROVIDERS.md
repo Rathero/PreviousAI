@@ -186,7 +186,12 @@ containing the point scores (92, 88, 78, 66, 42) on the **Floods** risk; the riv
 study name go into the headline. Only complete answers are cached. Free use with
 attribution to MITECO.
 
-The national analysis calls the same WFS differently: one `BBOX` query per municipality
+The national analysis calls the same WFS two ways. First a **screen**: `resultType=hits`
+with a `BBOX` filter returns a count and no geometry — 510 bytes and 0.1 s — so every one
+of Spain's 7,597 municipalities can be asked "is anything mapped over you at all?" in 66
+minutes. A third of them answer no, and are never asked anything more expensive.
+
+Then, for the ones worth it: one `BBOX` query per municipality
 per layer, which returns each feature's **whole** geometry (a river that crosses half a
 province is several megabytes). Those polygons are indexed once per municipality by
 `app/spatial.py` and every cadastral footprint is tested against that index, so an answer

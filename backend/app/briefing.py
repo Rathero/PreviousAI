@@ -335,6 +335,11 @@ def _what_to_do(report: dict, worst: dict | None) -> tuple[str, str, str] | None
     return None
 
 
+def _join_labels(labels: list[str]) -> str:
+    """"a", "a and b", "a, b and c" — read aloud, so "and" and not an ampersand."""
+    return labels[0] if len(labels) == 1 else ", ".join(labels[:-1]) + " and " + labels[-1]
+
+
 def build_script(report: dict) -> list[Scene]:
     """The script, scene by scene: the four risks exactly as the app shows them (the worst
     opens, those of 20 or more get a scene each, all of them close), each told through
@@ -356,6 +361,12 @@ def build_script(report: dict) -> list[Scene]:
     if worst:
         when = "for these dates" if report.get("mode") == "travel" else "here"
         intro += f" The biggest risk {when} comes from {worst['label'].lower()}."
+    # "The biggest risk" is a claim about all four. When one of them could not be
+    # measured, the voice says so in the same breath rather than letting silence pass
+    # for a low score.
+    unknown = [r["label"].lower() for r in view.risks(report) if r.get("unavailable")]
+    if unknown:
+        intro += f" We could not measure {_join_labels(unknown)} for this address today."
     subject = ("your home" if report.get("mode") != "travel" and report.get("dwelling")
                else "this place")
     scenes = [Scene(

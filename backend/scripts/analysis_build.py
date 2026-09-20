@@ -9,6 +9,8 @@ a different ranking every time somebody opened it.
     python backend/scripts/analysis_build.py --only catalonia     # the Catalan layers
     python backend/scripts/analysis_build.py --only exposure --municipality 46188
     python backend/scripts/analysis_build.py --only exposure --province 46 --top 10
+    python backend/scripts/analysis_build.py --only screen        # all of Spain, cheap
+    python backend/scripts/analysis_build.py --only exposure --per-province 10
     python backend/scripts/analysis_build.py --only assets        # TALAIA, needs a key
     python backend/scripts/analysis_build.py --only heat --top 25 # ERA5, quota allowing
     python backend/scripts/analysis_build.py --only ranking       # assemble
@@ -28,6 +30,11 @@ The blocks, and why each one is shaped the way it is:
   climate    Offline. The EURO-CORDEX fire-danger grid was already downloaded for the
              reports (data/cds), and it is the only climate layer that covers all of
              Spain without asking anything of anyone.
+  screen     Cheap and national. `resultType=hits` asks the flood WFS for a COUNT and
+             no geometry - 510 bytes, a tenth of a second - so every town in Spain can
+             be asked whether any official zone reaches it at all: 66 minutes for the
+             7,597, and a third of them answer no. That answer is worth having on its
+             own, and it is what aims the expensive step below.
   exposure   The expensive one, and the only one that is per building. It downloads a
              municipality's cadastral footprints (about 1.5 MB) and the official flood
              polygons over its bounding box, then crosses them. This is the same
@@ -873,17 +880,54 @@ def _residents_in_zone(code: str, exp: dict, cells: list[dict]) -> dict | None:
         if b["ref"] in exposed_refs:
             slot["exposed"] += dw
 
+    # People per dwelling, cell by cell, and the town's own figure from the cells big
+    # enough to be trusted. A 1 km cell straddles the municipal boundary, and the
+    # neighbours' residents are in its census count while their buildings are not in
+    # this town's cadastre: València has cells with 4,693 residents and 14 cadastral
+    # dwellings, which apportions to 335 people per home. The cell's ratio is therefore
+    # only believed within a factor of two of the town's own, and outside that the
+    # town's figure is used. Paiporta and Zaragoza, whose cells are all sane, are
+    # untouched by the clamp; València stops claiming 13 people per flooded dwelling.
+    ratios = sorted(float(s["cell"].get("population") or 0) / s["all"]
+                    for s in grid.values() if s["all"] >= 50)
+    # The town's figure is itself held to a plausible household: a municipality of two
+    # square kilometres (Massanassa, Sedaví) has NO uncontaminated cell - every one of
+    # its 1 km squares reaches into a denser neighbour - so its median comes out at six
+    # people per home and the per-cell clamp, measured against that median, lets it
+    # through. INE's average household is 2.5; anything outside 1.5 to 3.0 is the
+    # boundary, not the town. Where the clamp binds, the figure is an upper bound and
+    # `persons_per_dwelling` in the output says so.
+    town_ppd = ratios[len(ratios) // 2] if ratios else 2.5
+    town_ppd = min(max(town_ppd, 1.5), 3.0)
+    # And the cell's own figure never leaves the plausible band either. Bounding the
+    # cell at twice the town's alone was not enough: Massanassa's median is pinned at
+    # the town ceiling of 3.0 and twice that is six people to a flat. Nothing in Spain
+    # averages more than three.
+    lo, hi = max(1.0, town_ppd * 0.5), min(3.0, town_ppd * 2.0)
+
     residents = 0.0
-    counted = 0
+    counted = clamped = 0
     for slot in grid.values():
         if slot["all"] <= 0 or slot["exposed"] <= 0:
             continue
-        residents += float(slot["cell"].get("population") or 0) * slot["exposed"] / slot["all"]
+        ppd = float(slot["cell"].get("population") or 0) / slot["all"]
+        if not lo <= ppd <= hi:
+            clamped += 1
+            ppd = min(max(ppd, lo), hi)
+        residents += slot["exposed"] * ppd
         counted += 1
-    return {"residents": round(residents), "cells_with_flooded_homes": counted,
+
+    dwellings = exp["flood"]["dwellings"] or 0
+    return {"residents": round(residents),
+            "cells_with_flooded_homes": counted,
             "cells_in_area": len(grid),
+            "cells_clamped": clamped,
+            "persons_per_dwelling": round(residents / dwellings, 2) if dwellings else None,
+            "town_persons_per_dwelling": round(town_ppd, 2),
             "method": "1 km INE census cells apportioned by the share of each cell's "
-                      "cadastral dwellings that stand in a flood zone"}
+                      "cadastral dwellings that stand in a flood zone, with each "
+                      "cell's people-per-dwelling held within a factor of two of the "
+                      "municipality's own"}
 
 
 SUMMABLE = ("asset_count", "people_estimate", "people_from_registry",
@@ -1024,6 +1068,10 @@ def _asset_block(code: str, exp: dict, report: dict, tiles: list, what: str,
         "population_in_zone": (apportioned or {}).get("residents"),
         "population_method": (apportioned or {}).get("method"),
         "population_cells": (apportioned or {}).get("cells_with_flooded_homes"),
+        # Kept so the estimate can be argued with: how many people the figure implies
+        # per flooded dwelling, and how many cells needed their ratio held in band.
+        "persons_per_dwelling": (apportioned or {}).get("persons_per_dwelling"),
+        "population_cells_clamped": (apportioned or {}).get("cells_clamped"),
         "people_estimate": float(summary.get("people_estimate") or 0),
         "people_from_registry": float(summary.get("people_from_registry") or 0),
         "total_value_eur": float(summary.get("total_value_eur") or 0),
@@ -1146,6 +1194,11 @@ def build_ranking() -> dict:
             "province": m["province"], "province_code": m["province_code"],
             "comarca": m.get("comarca"),
             "centroid": centroid,
+            # What the cheap screen found: how many official flood polygons touch the
+            # town. Zero is an answer - "nothing is mapped here" - and the page says
+            # that instead of "not counted yet", which reads like an omission.
+            "flood_screen": m.get("flood_screen"),
+            "flood_screen_rank": m.get("flood_screen_rank"),
             "scores": {k: v for k, v in scores.items()},
             "metrics": {k: m.get(k) for k in
                         ("fire_weather_days", "fire_weather_2050", "fire_weather_context",
@@ -1188,6 +1241,8 @@ def build_ranking() -> dict:
             "municipalities": len(rows),
             "with_exposure": sum(1 for r in rows if r.get("exposure")),
             "with_assets": sum(1 for r in rows if r.get("people_at_risk") is not None),
+            "screened": sum(1 for r in rows if r.get("flood_screen") is not None),
+            "screened_dry": sum(1 for r in rows if r.get("flood_screen_rank") == 0),
             "with_climate": sum(1 for r in rows if r["scores"]["fire_weather"] is not None),
             "with_heat": sum(1 for r in rows if r["scores"]["heat"] is not None),
             "not_covered": data.get("not_covered"),
@@ -1270,7 +1325,10 @@ def pick(args, data: dict) -> list[dict]:
     if screened:
         # Nothing mapped over the town means nothing to count: skip it outright.
         munis = [m for m in munis if m.get("flood_screen_rank", 1) > 0]
-        order = lambda m: -(m.get("flood_screen_rank") or 0)  # noqa: E731
+        # The rank saturates: each layer counts at most 20 polygons, so a town covered
+        # by a river system and one covered by three of them both reach the ceiling.
+        # Ties are broken by name, which decides nothing but makes the run repeatable.
+        order = lambda m: (-(m.get("flood_screen_rank") or 0), m["name"])  # noqa: E731
     else:
         log("  no screen on disk: ordering by the overall score, which is mostly fire "
             "weather. Run --only screen first to choose by mapped flood risk.")

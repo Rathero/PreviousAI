@@ -260,9 +260,16 @@ def build(report: dict, tiles: list[dict]) -> dict:
     for key, risk in risks.items():
         risk.setdefault("title", STORY_TITLES[key])
     growing = [r["phrase"] for k, r in risks.items() if r.get("direction") == "up" and r.get("phrase")]
+    # "Little change" is a finding, and it needs a projection behind it. With none of the
+    # four available the page has nothing to report, and must say that instead.
+    known = any(r.get("available") for r in risks.values())
     # Short enough to take no more lines than today's title, so the page keeps its height.
-    title = f"By 2050: more {_join(growing)}." if growing else "By 2050: little change here."
-    text = "What climate models project if emissions stay high."
+    title = (f"By 2050: more {_join(growing)}." if growing
+             else "By 2050: little change here." if known
+             else "By 2050: we have no projection for this address.")
+    text = ("What climate models project if emissions stay high." if known
+            else "The climate models could not be read for this point. Nothing here says "
+                 "the risks stay as they are.")
     highlights = [h for h in (_highlight(k, risks[k]) for k in ("wildfire", "flood", "heat")) if h]
     return {"title": title, "text": text, "risks": risks, "highlights": highlights,
             "scenario": SCENARIO_NOTE}

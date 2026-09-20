@@ -77,7 +77,8 @@ async def _get_with_retry(url: str, params: dict) -> dict:
                 last = UpstreamError(
                     "Open-Meteo request limit reached (429"
                     + (f": {reason}" if reason else "") + "). Saved places are still "
-                    "served from the cache; new places can be analysed again shortly."
+                    "served from the cache; new places can be analysed again "
+                    + ("tomorrow." if "daily" in reason.lower() else "shortly.")
                 )
                 if any(w in reason.lower() for w in ("hourly", "daily")):
                     raise last
@@ -102,6 +103,14 @@ _VARYING = {"latitude", "longitude", "end_date"}
 # REUSE_DZ_M of a saved point, that series is reused (the report says so).
 REUSE_KM = 1.0
 REUSE_DZ_M = 50.0
+
+# Last resort when Open-Meteo answers nothing at all (the daily limit is the usual
+# reason): a series saved further away is served instead of no report. Wider than
+# REUSE_KM because nothing better is coming, and bounded by height because height, not
+# distance, is what moves a climate here: 25 km along the same plain is the same weather,
+# 300 m up is not. The report always says how far the series was borrowed from.
+RESCUE_KM = 25.0
+RESCUE_DZ_M = 300.0
 
 
 def nearby_cached(namespace: str, url: str, params: dict, max_km: float = NEARBY_KM,
@@ -143,8 +152,23 @@ def nearby_cached(namespace: str, url: str, params: dict, max_km: float = NEARBY
     if best is None:
         return None
     (_d, _t), value, other = best
-    return {**value, "_nearby": {"latitude": other["latitude"], "longitude": other["longitude"],
-                                 "distance_km": round(_d, 2)}}
+    near = {"latitude": other["latitude"], "longitude": other["longitude"],
+            "distance_km": round(_d, 2)}
+    if height is not None and value.get("elevation") is not None:
+        near["height_diff_m"] = round(value["elevation"] - height)
+    return {**value, "_nearby": near}
+
+
+def _rescue(namespace: str, url: str, params: dict, height: float | None) -> dict | None:
+    """The furthest saved series allowed when the API answers nothing at all.
+
+    With the point's height known the search reaches RESCUE_KM, because the height filter
+    is what keeps a borrowed series honest over that distance; without a height nothing
+    beyond NEARBY_KM is trusted, since a series could then be lifted off a mountain.
+    """
+    if height is None:
+        return nearby_cached(namespace, url, params)
+    return nearby_cached(namespace, url, params, RESCUE_KM, height, RESCUE_DZ_M)
 
 
 def _reuse(namespace: str, url: str, params: dict, height: float | None,
@@ -182,7 +206,7 @@ async def _get_json(url: str, params: dict, namespace: str, height: float | None
         if config.OFFLINE_FALLBACK:
             stale = cache.get(namespace, key, allow_stale=True)
             if stale is None:
-                stale = nearby_cached(namespace, url, params)
+                stale = _rescue(namespace, url, params, height)
             if stale is not None:
                 stale["_cached"] = True
                 stale["_stale"] = True
@@ -237,7 +261,7 @@ async def fetch_archive(lat: float, lon: float, height: float | None = None) -> 
     except UpstreamError:
         stale = cache.get("archive_latest", latest_key, allow_stale=True)
         if stale is None:
-            stale = nearby_cached("archive", ARCHIVE_URL, params)
+            stale = _rescue("archive", ARCHIVE_URL, params, height)
         if stale is None or not config.OFFLINE_FALLBACK:
             raise
         stale["_cached"] = True

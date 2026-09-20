@@ -334,10 +334,14 @@ def _indicators(row: dict, exp: dict | None) -> list[Indicator]:
             provenance=Provenance(
                 period=str(assets.get("generated_at") or "")[:10] or "as published",
                 confidence="medium",
-                method="INE census grid, area-weighted to the box around the buildings "
-                       f"that stand in a flood zone ({assets['aoi']['km2']} km2). It "
-                       "counts residents of that ground, not of the buildings",
+                method=assets.get("population_method") or "INE census grid",
                 **TALAIA_AOI),
+            context=(f"{assets['persons_per_dwelling']} residents per flooded dwelling"
+                     + (f"; {assets['population_cells_clamped']} of "
+                        f"{assets['population_cells']} census cells needed their ratio "
+                        "held in band, so this is an upper bound"
+                        if assets.get("population_cells_clamped") else "")
+                     if assets.get("persons_per_dwelling") is not None else None),
         ))
         out.append(Indicator(
             key="institutions_flooded",

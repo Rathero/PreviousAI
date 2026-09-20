@@ -225,5 +225,9 @@ def build(report: dict, tiles: list[dict]) -> dict:
     # At most three, so the title takes no more lines than today's and the page keeps its
     # height; the heat, the last one, is the first to go.
     seen = [r["phrase"] for r in risks.values() if r.get("phrase")][:3]
-    title = f"This area has seen {_join(seen)}." if seen else "Nothing extreme on record near this home."
+    # Silence in the record means "nothing happened" only once the record has been read.
+    # With the climate series missing, most of what this view reads is missing with it.
+    title = (f"This area has seen {_join(seen)}." if seen
+             else "Part of the record could not be read for this home."
+             if report.get("partial") else "Nothing extreme on record near this home.")
     return {"title": title, "text": TEXT, "risks": risks}
