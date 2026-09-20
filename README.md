@@ -139,12 +139,21 @@ scales at two other units:
   `providers/miteco.py` asks for one point, asked once per building. It answers with the
   count of exposed buildings, the dwellings inside them and how many were raised before
   1980, and every row links to that building's own report.
+- **Who is inside.** The cadastre says a building is there and how many dwellings it
+  holds; it does not say it is a care home with forty beds, or that a thousand people
+  live on that block. [TALAIA](PROVIDERS.md#talaia) does, for the area around the
+  exposed buildings: resident population, named schools and care homes with their
+  capacity, hazardous sites, livestock and a modelled replacement value — each one put
+  in a flood zone by the same test the buildings went through. It needs
+  `TALAIA_API_KEY`; without it the analysis is built exactly as before and says the
+  inventory was not asked for.
 
 ```bash
 python backend/scripts/analysis_build.py --only universe    # who exists, from the cadastre
 python backend/scripts/analysis_build.py --only climate     # the fire-danger grid, offline
 python backend/scripts/analysis_build.py --only catalonia   # the Catalan layers
 python backend/scripts/analysis_build.py --only exposure --municipality 46188
+python backend/scripts/analysis_build.py --only assets      # who is inside (TALAIA)
 python backend/scripts/analysis_build.py --only ranking     # assemble
 ```
 
@@ -160,8 +169,11 @@ Two scales are its own, and they are in `scoring.py` with the rest: `fire_weathe
 separate scale) and the municipal flood reading, where the worst zone sets a ceiling and
 the share of the town standing in it decides how much of that ceiling the town gets.
 
-It ranks buildings, never people. The unit is a cadastral footprint and what the cadastre
-publishes about it — year, use, dwellings, floor area. Who lives in it is not in here.
+It ranks buildings and places, never people. The unit is a cadastral footprint and what
+the cadastre publishes about it — year, use, dwellings, floor area — plus, where the
+inventory has been asked for, the institutions on that ground and the census population
+of it. Census population is a figure for an area, not for a household; no resident,
+owner or occupant data is downloaded, stored or shown.
 
 ### Scores
 

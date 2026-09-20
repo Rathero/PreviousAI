@@ -9,6 +9,7 @@ a different ranking every time somebody opened it.
     python backend/scripts/analysis_build.py --only catalonia     # the Catalan layers
     python backend/scripts/analysis_build.py --only exposure --municipality 46188
     python backend/scripts/analysis_build.py --only exposure --province 46 --top 10
+    python backend/scripts/analysis_build.py --only assets        # TALAIA, needs a key
     python backend/scripts/analysis_build.py --only heat --top 25 # ERA5, quota allowing
     python backend/scripts/analysis_build.py --only ranking       # assemble
     python backend/scripts/analysis_build.py                      # all of the above
@@ -16,7 +17,7 @@ a different ranking every time somebody opened it.
 Each block writes its own file and can be re-run on its own; `--only ranking` is cheap
 and only reassembles what the others left on disk.
 
-The four blocks, and why each one is shaped the way it is:
+The blocks, and why each one is shaped the way it is:
 
   universe   The list of municipalities comes from the cadastre's own ATOM feeds,
              because they are the index of the building downloads used later, and each
@@ -31,6 +32,11 @@ The four blocks, and why each one is shaped the way it is:
              municipality's cadastral footprints (about 1.5 MB) and the official flood
              polygons over its bounding box, then crosses them. This is the same
              question providers/miteco.py asks for one point, asked once per building.
+  assets     TALAIA: who and what stands in the flood zone the exposure found - the
+             schools, care homes, farms and hazardous sites, with their capacity and a
+             replacement valuation, and the census population of the ground. The
+             cadastre cannot say any of it. Needs TALAIA_API_KEY; without it the step
+             says so and changes nothing.
   heat       ERA5 through Open-Meteo, whose free tier is capped per day. It is asked
              only for the municipalities named, it stops at the first quota error and
              what it did not reach stays null instead of being guessed.
@@ -569,6 +575,186 @@ def _flood_layers():
 
 
 # --------------------------------------------------------------------------- #
+# assets: who and what stands in the flood zone, not just how many buildings
+# --------------------------------------------------------------------------- #
+
+def _flood_index(code: str, bbox: list[float]) -> dict:
+    """The municipality's flood-zone indexes, rebuilt from the cached WFS answers.
+
+    No network: `--only exposure` already saved every layer's polygons under
+    data/analysis/raw/flood, and this reads them back so an asset is placed in a zone
+    by exactly the same test the buildings went through.
+    """
+    indexes = {}
+    for key in _flood_layers():
+        path = RAW / "flood" / f"{code}_{key}.json"
+        if not path.exists():
+            continue
+        try:
+            payload = json.loads(path.read_text(encoding="utf-8", errors="replace"))
+        except json.JSONDecodeError:
+            continue
+        polys = []
+        for feat in payload.get("features") or []:
+            polys.extend(spatial.rings_from_geojson(feat.get("geometry")))
+        if polys:
+            indexes[key] = spatial.BandIndex(polys)
+    return indexes
+
+
+def _asset_aoi(exp: dict) -> tuple[list[float], str]:
+    """The area to ask TALAIA about: where the exposed buildings are.
+
+    Not the whole municipality. Murcia's bounding box is over a thousand square
+    kilometres, four times what the free tier allows, and nine tenths of it is country
+    nobody is going to evacuate. The box around the buildings that stand in a flood
+    zone is smaller, inside the limit, and is the only part anyone will act on.
+    """
+    pts = [(b["lon"], b["lat"]) for b in (exp.get("exposed") or [])]
+    if not pts:
+        return exp["bbox"], "municipality"
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    pad = 0.002  # ~200 m, so a school across the street is not cut off
+    return [min(xs) - pad, min(ys) - pad, max(xs) + pad, max(ys) + pad], "flooded area"
+
+
+def build_assets(codes: list[str], *, force: bool = False) -> None:
+    """Add the inventory of people, institutions and value to each exposure on disk."""
+    import asyncio
+
+    from app.providers import talaia
+
+    if not talaia.available():
+        log("assets: TALAIA_API_KEY is not set, so nothing was asked and nothing was "
+            "invented. Set it in .env and re-run --only assets.")
+        return
+
+    who = asyncio.run(talaia.whoami())
+    limits = asyncio.run(talaia.tiers())
+    tier = who.get("tier") if who.get("ok") else None
+    max_km2 = next((float(t["max_aoi_km2"]) for t in (limits.get("tiers") or [])
+                    if t["name"] == tier and isinstance(t.get("max_aoi_km2"), (int, float))),
+                   None)
+    if not who.get("ok"):
+        log(f"assets: the key was refused ({who.get('error')}), nothing was asked")
+        return
+    log(f"assets: key on tier '{tier}'"
+        + (f", up to {max_km2:.0f} km2 per call" if max_km2 else ""))
+
+    done = skipped = 0
+    for code in codes:
+        exp = analysis.read(analysis.EXPOSURE_DIR / f"{code}.json.gz")
+        if not exp:
+            continue
+        if exp.get("assets") and not force:
+            log(f"  {code} {exp['name']}: already asked")
+            continue
+
+        aoi_bbox, what = _asset_aoi(exp)
+        area = spatial.haversine_area_km2(tuple(aoi_bbox))
+        if max_km2 and area > max_km2:
+            exp["assets"] = {"available": False, "aoi_km2": round(area, 1),
+                             "reason": f"the {what} covers {area:.0f} km2, over the "
+                                       f"{max_km2:.0f} km2 the '{tier}' tier allows"}
+            analysis.write(analysis.EXPOSURE_DIR / f"{code}.json.gz", exp)
+            log(f"  {code} {exp['name']}: {area:.0f} km2, over the tier limit, skipped")
+            skipped += 1
+            continue
+
+        report = asyncio.run(talaia.exposure(
+            talaia.bbox_polygon(aoi_bbox), cache_key=f"{code}:{aoi_bbox}"))
+        if not report.get("ok"):
+            log(f"  {code} {exp['name']}: {report.get('error')}")
+            skipped += 1
+            continue
+
+        exp["assets"] = _asset_block(code, exp, report, aoi_bbox, what, area)
+        analysis.write(analysis.EXPOSURE_DIR / f"{code}.json.gz", exp)
+        a = exp["assets"]
+        log(f"  {code} {exp['name']}: {a['count']} assets, "
+            f"{a['population_resident']:.0f} residents in the area, "
+            f"{a['in_flood_zone']['count']} of them inside a flood zone "
+            f"({a['in_flood_zone']['people']:.0f} people at capacity)")
+        done += 1
+    log(f"assets: {done} municipalities, {skipped} skipped")
+
+
+# What an institution is called out for: a school, a care home, a hospital, a campsite.
+# `hazardous` and `response` come from TALAIA's own flags.
+def _asset_block(code: str, exp: dict, report: dict, aoi_bbox, what: str,
+                 area: float) -> dict:
+    summary = report.get("summary") or {}
+    indexes = _flood_index(code, exp["bbox"])
+    order = sorted(indexes, key=lambda k: -scoring.FLOOD_ZONE_SCORES.get(k, 0))
+
+    items, by_zone = [], {}
+    inside_people = inside_value = 0.0
+    for asset in report.get("assets") or []:
+        lat, lon = asset.get("lat"), asset.get("lon")
+        zone = None
+        if lat is not None and lon is not None:
+            zone = next((k for k in order if indexes[k].contains(lon, lat)), None)
+        capacity = asset.get("capacity") or {}
+        valuation = asset.get("valuation") or {}
+        row = {
+            "name": asset.get("name"),
+            "category": asset.get("category"),
+            "subcategory": asset.get("subcategory"),
+            "lat": lat, "lon": lon,
+            "people": capacity.get("people"),
+            "beds": capacity.get("beds"),
+            "students": capacity.get("students"),
+            "livestock_units": capacity.get("livestock_units"),
+            "value_eur": valuation.get("total_eur"),
+            "hazardous": bool(asset.get("hazardous")),
+            "response": bool(asset.get("response_asset")),
+            "human_bearing": bool(asset.get("human_bearing")),
+            "zone": zone,
+        }
+        items.append(row)
+        if zone:
+            by_zone[zone] = by_zone.get(zone, 0) + 1
+            inside_people += float(row["people"] or 0)
+            inside_value += float(row["value_eur"] or 0)
+
+    inside = [i for i in items if i["zone"]]
+    # Worst zone first, then the ones that hold people, then the biggest.
+    rank = {k: -scoring.FLOOD_ZONE_SCORES.get(k, 0) for k in scoring.FLOOD_ZONE_SCORES}
+    inside.sort(key=lambda i: (rank.get(i["zone"], 0), not i["human_bearing"],
+                               -(i["people"] or 0)))
+
+    return {
+        "available": True,
+        "aoi": {"bbox": aoi_bbox, "covers": what, "km2": round(area, 1)},
+        "count": summary.get("asset_count") or len(items),
+        "population_resident": float(summary.get("population_resident") or 0),
+        "people_estimate": float(summary.get("people_estimate") or 0),
+        "people_from_registry": float(summary.get("people_from_registry") or 0),
+        "total_value_eur": float(summary.get("total_value_eur") or 0),
+        "critical": summary.get("critical_assets") or 0,
+        "hazardous": summary.get("hazardous_assets") or 0,
+        "response": summary.get("response_assets") or 0,
+        "livestock_units": float(summary.get("livestock_units") or 0),
+        "by_category": summary.get("by_category") or [],
+        "in_flood_zone": {
+            "count": len(inside),
+            "people": round(inside_people, 1),
+            "value_eur": round(inside_value, 0),
+            "by_zone": [{"zone": k, "count": v} for k, v in
+                        sorted(by_zone.items(),
+                               key=lambda kv: -scoring.FLOOD_ZONE_SCORES.get(kv[0], 0))],
+            # The list an emergency service reads: named, with its zone and its people.
+            "items": [i for i in inside if i["human_bearing"] or i["hazardous"]][:200],
+        },
+        "truncated": bool(report.get("assets_truncated")),
+        "warnings": report.get("warnings") or [],
+        "sources": [s.get("id") or s.get("name") for s in (report.get("sources") or [])][:40],
+        "generated_at": report.get("generated_at"),
+    }
+
+
+# --------------------------------------------------------------------------- #
 # heat: ERA5, for the municipalities we can afford
 # --------------------------------------------------------------------------- #
 
@@ -682,6 +868,19 @@ def build_ranking() -> dict:
             }
             # What an institution actually plans around: not a score, a number of homes.
             row["homes_at_risk"] = exp["flood"]["dwellings"]
+            assets = exp.get("assets") or {}
+            if assets.get("available"):
+                inside = assets["in_flood_zone"]
+                row["exposure"].update({
+                    "population": assets["population_resident"],
+                    "institutions": inside["count"],
+                    "institution_people": inside["people"],
+                    "value_eur": inside["value_eur"],
+                    "hazardous": assets["hazardous"],
+                })
+                # Residents of the flooded area, apportioned from the census grid. The
+                # dwelling count says how many homes; this says how many people.
+                row["people_at_risk"] = round(assets["population_resident"])
         rows.append(row)
 
     payload = {
@@ -690,6 +889,7 @@ def build_ranking() -> dict:
             "built": dt.date.today().isoformat(),
             "municipalities": len(rows),
             "with_exposure": sum(1 for r in rows if r.get("exposure")),
+            "with_assets": sum(1 for r in rows if r.get("people_at_risk") is not None),
             "with_climate": sum(1 for r in rows if r["scores"]["fire_weather"] is not None),
             "with_heat": sum(1 for r in rows if r["scores"]["heat"] is not None),
             "not_covered": data.get("not_covered"),
@@ -769,7 +969,7 @@ def main() -> None:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument("--only", choices=["universe", "climate", "catalonia", "exposure",
-                                      "heat", "ranking"], action="append")
+                                      "assets", "heat", "ranking"], action="append")
     p.add_argument("--municipality", action="append",
                    help="cadastral code, e.g. 46188 (Paiporta). Repeatable.")
     p.add_argument("--province", help="two-digit province code, e.g. 46")
@@ -778,7 +978,8 @@ def main() -> None:
     p.add_argument("--force", action="store_true", help="rebuild what is already on disk")
     args = p.parse_args()
 
-    steps = args.only or ["universe", "climate", "catalonia", "exposure", "ranking"]
+    steps = args.only or ["universe", "climate", "catalonia", "exposure", "assets",
+                          "ranking"]
     with httpx.Client(timeout=TIMEOUT, headers=HEADERS, follow_redirects=True) as client:
         if "universe" in steps:
             build_universe(client)
@@ -796,6 +997,13 @@ def main() -> None:
                 except Exception as exc:
                     log(f"  {muni['code']} {muni['name']}: failed "
                         f"({type(exc).__name__}: {exc})")
+        if "assets" in steps:
+            # Only where the buildings are already counted: the area asked about is the
+            # box around them, and without them there is nothing to place in a zone.
+            built = sorted(f.name[:-8] for f in analysis.EXPOSURE_DIR.glob("*.json.gz"))
+            codes = args.municipality or built
+            log(f"assets: {len(codes)} municipalities with an exposure on disk")
+            build_assets(codes, force=args.force)
         if "heat" in steps:
             data = load_universe()
             codes = args.municipality or [m["code"] for m in pick(args, data)]

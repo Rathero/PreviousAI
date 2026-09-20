@@ -1509,3 +1509,11 @@ button.an-row:hover { background: rgba(255, 255, 255, 0.07); }
   font-size: 13px; line-height: 1.5; color: var(--cream-55); text-decoration: none;
 }
 .home-alt:hover { color: var(--cream-85); text-decoration: underline; }
+
+/* TALAIA's inventory: what stands in the zone, next to how many buildings do. */
+.an-asset {
+  display: grid; grid-template-columns: 150px 1fr; gap: 12px; align-items: center;
+  padding: 9px 12px; border-radius: 10px; background: rgba(0, 0, 0, 0.20);
+}
+.an-caveat { color: var(--cream-45); font-size: 12px; }
+@media (max-width: 760px) { .an-asset { grid-template-columns: 1fr; } }

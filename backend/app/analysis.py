@@ -50,17 +50,19 @@ VERSION = 1
 
 # The hazards the ranking can sort by. `overall` is the aggregate of the rest, with
 # the same rule the report uses: the worst hazard rules and the others push up a little.
-HAZARDS = ("overall", "homes", "flood", "fire_weather", "flood_history", "fire_history",
-           "avalanche", "heat")
+HAZARDS = ("overall", "people", "homes", "flood", "fire_weather", "flood_history",
+           "fire_history", "avalanche", "heat")
 
-# "homes" is not a score. It is the column an institution actually plans around: how
-# many dwellings stand in an official flood zone, in absolute numbers. A small town can
-# be a 92 and hold four hundred homes; a city can be a 70 and hold fifty thousand, and
-# whoever has to reach them needs to see the second one first.
-COUNTS = {"homes": "homes_at_risk"}
+# These two are not scores. They are the columns an institution actually plans around:
+# how many dwellings, and how many residents, stand in an official flood zone, in
+# absolute numbers. A small town can be a 92 and hold four hundred homes; a city can be
+# a 70 and hold fifty thousand, and whoever has to reach them needs the second one
+# first. `people` exists only where TALAIA has been asked (the `assets` build step).
+COUNTS = {"homes": "homes_at_risk", "people": "people_at_risk"}
 
 LABELS = {
     "overall": "Overall",
+    "people": "People in a flood zone",
     "homes": "Homes in a flood zone",
     "flood": "Flooding (official zones, per building)",
     "fire_weather": "Wildfire weather",
@@ -88,6 +90,15 @@ CDS_FIRE_GRID = dict(
     url="https://cds.climate.copernicus.eu/datasets/sis-tourism-fire-danger-indicators",
     scale="~11 km grid",
     scale_kind="grid",
+)
+
+TALAIA_AOI = dict(
+    source="TALAIA · values at risk inside a polygon",
+    dataset="talaia-v1-exposure",
+    resolution="per asset; population from the 1 km INE census grid",
+    url="https://talaia.up.railway.app",
+    scale="the flooded part of the municipality",
+    scale_kind="radius",
 )
 
 SNCZI_MUNICIPAL = dict(
@@ -193,6 +204,12 @@ def ranking(hazard: str = "overall", province: str | None = None, limit: int = 5
         rows = [r for r in rows if needle in _fold(r["name"])]
     if only_exposed:
         rows = [r for r in rows if r.get("exposure")]
+    if hazard in COUNTS:
+        # A count column lists the towns that HAVE the count. A town whose buildings
+        # were never crossed with the flood maps does not hold zero people; it holds an
+        # unknown number, and putting it in the list sorted as a zero would be a lie
+        # told in alphabetical order.
+        rows = [r for r in rows if r.get(COUNTS[hazard]) is not None]
     if min_score is not None:
         rows = [r for r in rows if _score(r, hazard) >= min_score]
 
@@ -306,6 +323,58 @@ def _indicators(row: dict, exp: dict | None) -> list[Indicator]:
                                       method="numberOfDwellings of each exposed "
                                              "building, as the cadastre publishes it",
                                       **CATASTRO),
+            ))
+
+    assets = (exp or {}).get("assets") or {}
+    if assets.get("available"):
+        inside = assets["in_flood_zone"]
+        out.append(Indicator(
+            key="population_flooded", label="Residents of the flooded area",
+            value=round(assets["population_resident"]), unit="people",
+            provenance=Provenance(
+                period=str(assets.get("generated_at") or "")[:10] or "as published",
+                confidence="medium",
+                method="INE census grid, area-weighted to the box around the buildings "
+                       f"that stand in a flood zone ({assets['aoi']['km2']} km2). It "
+                       "counts residents of that ground, not of the buildings",
+                **TALAIA_AOI),
+        ))
+        out.append(Indicator(
+            key="institutions_flooded",
+            label="Schools, care homes and other places that hold people, inside a zone",
+            value=inside["count"], unit="places",
+            provenance=Provenance(
+                period=str(assets.get("generated_at") or "")[:10] or "as published",
+                confidence="medium",
+                method="every asset TALAIA returned for the area, placed in a flood "
+                       "zone by the same point-in-polygon test the buildings went "
+                       "through",
+                **TALAIA_AOI),
+            context=(f"{inside['people']:.0f} people at capacity"
+                     if inside["people"] else None),
+        ))
+        if assets.get("hazardous"):
+            out.append(Indicator(
+                key="hazardous_sites", label="Hazardous sites in the area",
+                value=assets["hazardous"], unit="sites",
+                provenance=Provenance(
+                    period=str(assets.get("generated_at") or "")[:10] or "as published",
+                    confidence="medium",
+                    method="assets TALAIA flags as hazardous (fuel, chemicals, "
+                           "industry holding dangerous substances)",
+                    **TALAIA_AOI),
+            ))
+        if inside.get("value_eur"):
+            out.append(Indicator(
+                key="value_flooded", label="Replacement value inside a flood zone",
+                value=round(inside["value_eur"]), unit="EUR",
+                provenance=Provenance(
+                    period=str(assets.get("generated_at") or "")[:10] or "as published",
+                    confidence="low",
+                    method="TALAIA's replacement valuation of the assets inside a "
+                           "zone. A modelled cost from class defaults, not a survey "
+                           "and not a market value",
+                    **TALAIA_AOI),
             ))
 
     for key, label, period, method, source in _CATALAN_INDICATORS:

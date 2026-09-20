@@ -164,11 +164,12 @@ function render() {
 
   // A count column is drawn against the biggest value on the page, not against 100:
   // the bar says "compared with the worst town here", which is what it is.
+  const countKey = state.hazard === "people" ? "people_at_risk" : "homes_at_risk";
   const peak = state.isCount
-    ? Math.max(1, ...state.rows.map((r) => r.homes_at_risk || 0)) : 100;
+    ? Math.max(1, ...state.rows.map((r) => r[countKey] || 0)) : 100;
 
   const rows = state.rows.map((r) => {
-    const value = state.isCount ? r.homes_at_risk : r.scores[state.hazard];
+    const value = state.isCount ? r[countKey] : r.scores[state.hazard];
     const width = Math.max(2, Math.round(((value ?? 0) / peak) * 100));
     const shade = state.isCount ? scoreLevel(r.scores.flood) : scoreLevel(value);
     return `
@@ -186,10 +187,23 @@ function render() {
       </button>`;
   }).join("");
 
-  setHtml($("#anTable"), head + (rows || `<p class="an-empty">Nothing matches these filters.</p>`));
+  setHtml($("#anTable"), head + (rows || `<p class="an-empty">${esc(emptyMessage())}</p>`));
   $("#anMore").hidden = state.rows.length >= state.total;
 
   setHtml($("#anNote"), note(meta));
+}
+
+// Why a column can be empty, said precisely. "Nothing matches" is true and useless.
+function emptyMessage() {
+  if (state.hazard === "people") {
+    return "No town has this column yet: it comes from the inventory step "
+      + "(analysis_build.py --only assets), which needs a TALAIA key.";
+  }
+  if (state.hazard === "homes") {
+    return "No town here has had its buildings counted against the official flood maps "
+      + "yet (analysis_build.py --only exposure).";
+  }
+  return "Nothing matches these filters.";
 }
 
 function scoreLevel(score) {
@@ -209,6 +223,15 @@ function labelFor(key) {
 function fact(row, showsFlood) {
   if (showsFlood && row.exposure) {
     const e = row.exposure;
+    if (state.hazard === "people" && e.institutions !== undefined) {
+      return `<strong>${fmt(e.institutions)}</strong> schools, care homes and the like`
+        + `<small>${fmt(e.flooded_dwellings)} homes · ${esc(ZONE_LABEL[e.worst_zone] || "")}</small>`;
+    }
+    // The count column already prints the number; here say what it sits in.
+    if (state.hazard === "homes") {
+      return `in <strong>${fmt(e.flooded_buildings)}</strong> of the town's ${fmt(e.buildings)} buildings`
+        + `<small>${esc(ZONE_LABEL[e.worst_zone] || "")}</small>`;
+    }
     return `<strong>${fmt(e.flooded_dwellings)}</strong> in ${fmt(e.flooded_buildings)} buildings`
       + `<small>${esc(ZONE_LABEL[e.worst_zone] || "")}</small>`;
   }
@@ -348,6 +371,7 @@ function detailHtml(m) {
     </section>`;
 
   const sources = `
+    ${assetsHtml(exp)}
     <section class="an-sec">
       <h3>Where every number comes from</h3>
       <ul class="an-sources">
@@ -402,4 +426,70 @@ function buildingsHtml(data) {
           <span class="an-bgo">→</span>
         </a>`).join("")}
     </div>`;
+}
+
+
+// What the cadastre cannot say: who is inside, and what it is worth.
+// TALAIA answers for an AREA, so it is only ever shown here, never in a report.
+const CAT_LABEL = {
+  education: "Education", health: "Health", social: "Social care",
+  accommodation: "Accommodation", agriculture: "Farming", industry: "Industry",
+  infrastructure: "Infrastructure", heritage: "Heritage", commerce: "Commerce",
+  population: "Population", emergency: "Emergency services",
+};
+
+const eur = (n) => !n ? "—" : n >= 1e6
+  ? `€${(n / 1e6).toLocaleString("en", { maximumFractionDigits: 1 })} M`
+  : `€${Math.round(n).toLocaleString("en")}`;
+
+function assetsHtml(exp) {
+  const a = exp && exp.assets;
+  if (!a) return "";
+  if (!a.available) {
+    return `
+      <section class="an-sec">
+        <h3>Who and what is inside</h3>
+        <p class="an-secsub">Not asked for this town: ${esc(a.reason || "no inventory")}.</p>
+      </section>`;
+  }
+  const inside = a.in_flood_zone;
+  const items = (inside.items || []).map((i) => `
+    <div class="an-asset">
+      <span class="an-bzone ${levelClass(scoreLevel(zoneScore(i.zone)))}">${esc(ZONE_LABEL[i.zone] || i.zone)}</span>
+      <span class="an-bmain">
+        <strong>${esc(i.name || CAT_LABEL[i.category] || "Unnamed")}${i.hazardous ? " ⚠" : ""}</strong>
+        <small>${esc(CAT_LABEL[i.category] || i.category || "")}${i.subcategory ? ` · ${esc(i.subcategory.replace(/_/g, " "))}` : ""}${
+          i.people ? ` · ${fmt(i.people)} people at capacity` : ""}${
+          i.beds ? ` · ${fmt(i.beds)} beds` : ""}${
+          i.students ? ` · ${fmt(i.students)} students` : ""}</small>
+      </span>
+    </div>`).join("");
+
+  return `
+    <section class="an-sec">
+      <h3>Who and what is inside</h3>
+      <p class="an-secsub">
+        Over the ${fmt(a.aoi.km2, 1)} km² around the buildings that stand in a flood zone:
+        <strong>${fmt(Math.round(a.population_resident))} residents</strong>,
+        ${fmt(a.count)} assets of which <strong>${fmt(inside.count)}</strong> fall inside a
+        zone${inside.people ? `, holding ${fmt(inside.people)} people at capacity` : ""}${
+          a.hazardous ? `, and ${fmt(a.hazardous)} hazardous sites` : ""}.
+        ${inside.value_eur ? `Replacement value inside a zone: ${eur(inside.value_eur)}.` : ""}
+      </p>
+      ${a.by_category.length ? `<div class="an-zones">${a.by_category.map((c) => `
+        <div class="an-zone">
+          <span class="an-zonename">${esc(CAT_LABEL[c.category] || c.label || c.category)}</span>
+          <span class="an-zonecount"><strong>${fmt(c.count)}</strong>${
+            c.people_estimate ? ` · ${fmt(c.people_estimate)} people` : ""}${
+            c.total_value_eur ? ` · ${eur(c.total_value_eur)}` : ""}</span>
+        </div>`).join("")}</div>` : ""}
+      ${items ? `<div class="an-blist">${items}</div>` : ""}
+      <p class="an-secsub an-caveat">Population is the census grid apportioned to that
+        area, not a count of who is in those buildings, and the valuation is modelled
+        from class defaults, not surveyed. None of it changes a score.</p>
+    </section>`;
+}
+
+function zoneScore(zone) {
+  return { zfp: 92, t10: 88, t50: 78, t100: 66, t500: 42 }[zone] ?? null;
 }

@@ -17,6 +17,7 @@ called. Two rules apply to all of them:
 | [MITECO · SNCZI](#miteco--snczi-flood-zones) | Official flood zones of Spain (T10–T500, preferential flow) | Live WFS | No | Floods |
 | [IGN](#ign-instituto-geográfico-nacional) | Flood water depths, CartoCiudad geocoder, PNOA aerial imagery | Live WMS / API / WMTS | No | Floods, address search, aerial view |
 | [Catastro · INSPIRE](#catastro--inspire-download-service) | Every municipality of Spain and every building footprint, with year, use and dwellings | Batch ATOM + GML | No | The national analysis (`/analisis`) |
+| [TALAIA](#talaia) | Who and what stands inside a polygon: schools, care homes, farms and livestock, hazardous sites, census population, replacement value | Batch REST | `TALAIA_API_KEY` | The national analysis (`/analisis`), never a report |
 | [ICGC](#icgc-institut-cartogràfic-i-geològic-de-catalunya) | Sea-level rise, avalanche map and avalanche database | Live WMS + batch WFS | No | Floods, avalanches, history |
 | [AGORA · University of Barcelona](#agora--university-of-barcelona) | Flood episodes per Catalan municipality, 1902–2020 | Batch | No | Floods, history |
 | [Government of Catalonia](#government-of-catalonia) | Wildfire perimeters, fires by municipality, INFOCAT class, Pla Alfa level | Batch + live | No | Wildfires, history |
@@ -83,6 +84,59 @@ on its web page.
 ---
 
 ## Official maps and records
+
+### TALAIA
+
+`talaia.up.railway.app` (`providers/talaia.py`), called in batch by
+`analysis_build.py --only assets`. Give it a polygon and it returns everything of value
+inside it, with capacity, a replacement valuation and the resident population of the
+ground.
+
+It exists here because the cadastre stops short. Catastro says a building is there, when
+it was raised, what it is broadly used for and how many dwellings it holds. It does not
+say that the building is a care home with forty beds, that a thousand people live on that
+block, or that the fuel depot two streets away is inside the same flood zone. This does.
+
+| What it adds | Where it shows |
+|---|---|
+| Resident population of the flooded area (INE 1 km census grid, area-weighted) | The `People in a flood zone` column of the ranking |
+| Schools, hospitals, care homes, campsites, named, with beds/students/capacity | "Who and what is inside", per municipality |
+| Hazardous sites, response assets, livestock units | The same section |
+| Replacement valuation | The same section, marked as modelled |
+
+**It answers about an AREA, which is why it is never in a report.** A resident does not
+act differently because two schools stand down the road; a town hall planning an
+evacuation acts on nothing else. That is the whole line between the two products, and it
+is the reason this integration was declined once for the report and taken for
+`/analisis`.
+
+**It never scores.** Like the fire detections and the alerts, it is context. A
+municipality's flood score comes from the official SNCZI zones and the cadastral
+buildings standing in them; nothing here moves it.
+
+Two things about how it is asked:
+
+- **The area sent is the box around the exposed buildings**, not the municipality. The
+  free tier allows 250 km² per call and Murcia's bounding box is over a thousand, nine
+  tenths of it country nobody will evacuate. The box around the buildings that stand in
+  a flood zone is inside the limit and is the only part anyone acts on. When even that
+  is over the limit the municipality records the refusal and its area.
+- **Each returned asset is placed in a flood zone by our own test**, the same
+  `app/spatial.py` index the buildings went through, rebuilt from the cached SNCZI
+  polygons. So "three schools in the preferential flow zone" is the same statement, made
+  the same way, as "1,213 buildings in it".
+
+Limits worth repeating wherever the numbers are shown, and which the page does show:
+population is the census grid apportioned to an area, not a count of who is inside those
+buildings; the valuation is modelled from class defaults, not surveyed; and capacity is
+what a place holds when full, not who is in it tonight.
+
+Key: `TALAIA_API_KEY`, self-service (`POST /v1/signup`, confirmed by an emailed link;
+the key is shown on the confirmation page, not mailed). Free tier: 60 requests a minute,
+1,000 a day, 250 km² and 2,000 assets per call. Without a key `--only assets` says so and
+builds nothing, and every other block of the analysis is unaffected.
+
+---
 
 ### Catastro · INSPIRE download service
 
