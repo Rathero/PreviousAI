@@ -116,11 +116,20 @@ buildings standing in them; nothing here moves it.
 
 Two things about how it is asked:
 
-- **The area sent is the box around the exposed buildings**, not the municipality. The
-  free tier allows 250 km² per call and Murcia's bounding box is over a thousand, nine
-  tenths of it country nobody will evacuate. The box around the buildings that stand in
-  a flood zone is inside the limit and is the only part anyone acts on. When even that
-  is over the limit the municipality records the refusal and its area.
+- **The area sent is where the exposed buildings are**, not the municipality, and it is
+  cut into parts. The free tier allows 250 km² per call; Murcia's municipal bounding box
+  is 2,176 km², and even one box drawn around its exposed buildings is 503 km², because
+  a flood zone follows a river and the buildings are strung along it with dry ground in
+  between. Six of the first thirty towns failed that way, Zaragoza and Murcia among them
+  — the two with the most homes at risk. So the extent is gridded, only the cells that
+  hold exposed buildings are asked about, and each is tightened to the buildings inside
+  it: all thirty towns then fit, in **55 calls** of the thousand a day the tier allows,
+  Zaragoza in six parts totalling 268 km² instead of one of 842.
+- **The parts are merged with the duplicates removed.** A site on the edge of two cells
+  comes back from both; it is dropped on its name, position and kind, and every total
+  that can be derived from the assets is recomputed from the deduplicated list instead
+  of summed from each part's own summary. Only the resident population is added up, as
+  the cells do not overlap.
 - **Each returned asset is placed in a flood zone by our own test**, the same
   `app/spatial.py` index the buildings went through, rebuilt from the cached SNCZI
   polygons. So "three schools in the preferential flow zone" is the same statement, made

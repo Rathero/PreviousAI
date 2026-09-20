@@ -48,6 +48,7 @@ import argparse
 import datetime as dt
 import gzip
 import json
+import math
 import re
 import sys
 import time
@@ -602,21 +603,53 @@ def _flood_index(code: str, bbox: list[float]) -> dict:
     return indexes
 
 
-def _asset_aoi(exp: dict) -> tuple[list[float], str]:
-    """The area to ask TALAIA about: where the exposed buildings are.
+PAD = 0.002  # ~200 m, so a school across the street from a flooded block is not cut off
+MAX_TILES = 12  # a town is worth a dozen calls of the thousand the free tier allows
 
-    Not the whole municipality. Murcia's bounding box is over a thousand square
-    kilometres, four times what the free tier allows, and nine tenths of it is country
-    nobody is going to evacuate. The box around the buildings that stand in a flood
-    zone is smaller, inside the limit, and is the only part anyone will act on.
+
+def _box(pts: list[tuple[float, float]]) -> list[float]:
+    xs = [p[0] for p in pts]
+    ys = [p[1] for p in pts]
+    return [min(xs) - PAD, min(ys) - PAD, max(xs) + PAD, max(ys) + PAD]
+
+
+def _asset_tiles(exp: dict, max_km2: float | None) -> tuple[list[list[float]], str]:
+    """The areas to ask TALAIA about: where the exposed buildings actually are.
+
+    Not the whole municipality - Murcia's bounding box is 2,176 km², nine tenths of it
+    country nobody will evacuate - but not one box around the exposed buildings either.
+    A flood zone follows a river: in Zaragoza the exposed buildings are strung along
+    30 km of the Ebro, so their common bounding box is 842 km² of which almost all is
+    dry. Six of the thirty towns built failed the tier's 250 km² that way, Zaragoza and
+    Murcia among them, which are the two with the most homes at risk.
+
+    So the extent is cut into a grid fine enough for one cell to fit the limit, and only
+    the cells that actually hold exposed buildings are asked about, each tightened to
+    the buildings inside it. A river corridor becomes a handful of small boxes and the
+    dry ground between them is never sent.
     """
     pts = [(b["lon"], b["lat"]) for b in (exp.get("exposed") or [])]
     if not pts:
-        return exp["bbox"], "municipality"
-    xs = [p[0] for p in pts]
-    ys = [p[1] for p in pts]
-    pad = 0.002  # ~200 m, so a school across the street is not cut off
-    return [min(xs) - pad, min(ys) - pad, max(xs) + pad, max(ys) + pad], "flooded area"
+        return [exp["bbox"]], "municipality"
+
+    full = _box(pts)
+    area = spatial.haversine_area_km2(tuple(full))
+    if not max_km2 or area <= max_km2:
+        return [full], "flooded area"
+
+    # A grid whose cell is comfortably inside the limit, then only the busy cells.
+    steps = math.ceil(math.sqrt(area / (max_km2 * 0.6)))
+    w = (full[2] - full[0]) / steps
+    h = (full[3] - full[1]) / steps
+    cells: dict[tuple[int, int], list] = {}
+    for x, y in pts:
+        key = (min(steps - 1, int((x - full[0]) / w)) if w else 0,
+               min(steps - 1, int((y - full[1]) / h)) if h else 0)
+        cells.setdefault(key, []).append((x, y))
+
+    tiles = [_box(v) for _, v in sorted(cells.items(), key=lambda kv: -len(kv[1]))]
+    tiles = [t for t in tiles if spatial.haversine_area_km2(tuple(t)) <= max_km2]
+    return tiles[:MAX_TILES], f"flooded area in {min(len(tiles), MAX_TILES)} parts"
 
 
 def build_assets(codes: list[str], *, force: bool = False) -> None:
@@ -651,25 +684,36 @@ def build_assets(codes: list[str], *, force: bool = False) -> None:
             log(f"  {code} {exp['name']}: already asked")
             continue
 
-        aoi_bbox, what = _asset_aoi(exp)
-        area = spatial.haversine_area_km2(tuple(aoi_bbox))
-        if max_km2 and area > max_km2:
-            exp["assets"] = {"available": False, "aoi_km2": round(area, 1),
-                             "reason": f"the {what} covers {area:.0f} km2, over the "
-                                       f"{max_km2:.0f} km2 the '{tier}' tier allows"}
+        tiles, what = _asset_tiles(exp, max_km2)
+        area = sum(spatial.haversine_area_km2(tuple(t)) for t in tiles)
+        if not tiles:
+            exp["assets"] = {"available": False, "aoi_km2": 0.0,
+                             "reason": "the flooded area could not be cut into parts "
+                                       f"inside the {max_km2:.0f} km2 the '{tier}' "
+                                       "tier allows"}
             analysis.write(analysis.EXPOSURE_DIR / f"{code}.json.gz", exp)
-            log(f"  {code} {exp['name']}: {area:.0f} km2, over the tier limit, skipped")
+            log(f"  {code} {exp['name']}: cannot fit the tier limit, skipped")
             skipped += 1
             continue
 
-        report = asyncio.run(talaia.exposure(
-            talaia.bbox_polygon(aoi_bbox), cache_key=f"{code}:{aoi_bbox}"))
-        if not report.get("ok"):
-            log(f"  {code} {exp['name']}: {report.get('error')}")
+        parts, failed = [], []
+        for tile in tiles:
+            part = asyncio.run(talaia.exposure(
+                talaia.bbox_polygon(tile), cache_key=f"{code}:{tile}"))
+            if part.get("ok"):
+                parts.append(part)
+            else:
+                failed.append(str(part.get("error"))[:120])
+        if not parts:
+            log(f"  {code} {exp['name']}: {failed[0] if failed else 'no answer'}")
             skipped += 1
             continue
 
-        exp["assets"] = _asset_block(code, exp, report, aoi_bbox, what, area)
+        report = _merge_reports(parts)
+        if failed:
+            report["warnings"].append(
+                f"{len(failed)} of {len(tiles)} parts failed: {failed[0]}")
+        exp["assets"] = _asset_block(code, exp, report, tiles, what, area)
         analysis.write(analysis.EXPOSURE_DIR / f"{code}.json.gz", exp)
         a = exp["assets"]
         log(f"  {code} {exp['name']}: {a['count']} assets, "
@@ -680,9 +724,85 @@ def build_assets(codes: list[str], *, force: bool = False) -> None:
     log(f"assets: {done} municipalities, {skipped} skipped")
 
 
+SUMMABLE = ("asset_count", "people_estimate", "people_from_registry",
+            "people_from_defaults", "population_resident", "total_value_eur",
+            "critical_assets", "hazardous_assets", "response_assets", "livestock_units")
+
+
+def _merge_reports(parts: list[dict]) -> dict:
+    """Several tiles of one town read as one report.
+
+    One tile is passed through untouched. Several are added up, with one rule: an asset
+    that arrives twice - a site on a tile edge, returned by both - is dropped on its
+    name, position and kind, and every total that can be derived from the assets is
+    then recomputed from the deduplicated list rather than summed from the tiles' own
+    summaries. Summing them would leave the school counted once in the list and twice
+    in the category breakdown, and a breakdown that disagrees with the list beside it
+    is worse than no breakdown.
+
+    Only the resident population is summed, because it comes from the census grid
+    apportioned to each tile and the tiles do not overlap.
+    """
+    if len(parts) == 1:
+        p = parts[0]
+        return {"summary": p.get("summary") or {}, "assets": p.get("assets") or [],
+                "assets_truncated": bool(p.get("assets_truncated")),
+                "sources": p.get("sources") or [], "warnings": list(p.get("warnings") or []),
+                "generated_at": p.get("generated_at")}
+
+    assets, seen, sources, warnings = [], set(), [], []
+    population = 0.0
+    truncated = False
+    for part in parts:
+        population += float((part.get("summary") or {}).get("population_resident") or 0)
+        for asset in part.get("assets") or []:
+            key = (asset.get("name"), round(asset.get("lat") or 0, 6),
+                   round(asset.get("lon") or 0, 6), asset.get("subcategory"))
+            if key in seen:
+                continue
+            seen.add(key)
+            assets.append(asset)
+        truncated = truncated or bool(part.get("assets_truncated"))
+        sources.extend(part.get("sources") or [])
+        warnings.extend(part.get("warnings") or [])
+
+    def num(asset, *path):
+        node = asset
+        for step in path:
+            node = (node or {}).get(step)
+        return float(node or 0)
+
+    by_category: dict[str, dict] = {}
+    for a in assets:
+        cat = a.get("category") or "other"
+        row = by_category.setdefault(cat, {"category": cat, "label": cat.title(),
+                                           "count": 0, "people_estimate": 0.0,
+                                           "total_value_eur": 0.0,
+                                           "human_bearing": False})
+        row["count"] += 1
+        row["people_estimate"] += num(a, "capacity", "people")
+        row["total_value_eur"] += num(a, "valuation", "total_eur")
+        row["human_bearing"] = row["human_bearing"] or bool(a.get("human_bearing"))
+
+    summary = {
+        "asset_count": len(assets),
+        "people_estimate": sum(num(a, "capacity", "people") for a in assets),
+        "population_resident": population,
+        "total_value_eur": sum(num(a, "valuation", "total_eur") for a in assets),
+        "livestock_units": sum(num(a, "capacity", "livestock_units") for a in assets),
+        "critical_assets": sum(1 for a in assets if a.get("criticality", 0) >= 80),
+        "hazardous_assets": sum(1 for a in assets if a.get("hazardous")),
+        "response_assets": sum(1 for a in assets if a.get("response_asset")),
+        "by_category": sorted(by_category.values(), key=lambda c: -c["count"]),
+    }
+    return {"summary": summary, "assets": assets, "assets_truncated": truncated,
+            "sources": sources, "warnings": warnings,
+            "generated_at": parts[0].get("generated_at")}
+
+
 # What an institution is called out for: a school, a care home, a hospital, a campsite.
 # `hazardous` and `response` come from TALAIA's own flags.
-def _asset_block(code: str, exp: dict, report: dict, aoi_bbox, what: str,
+def _asset_block(code: str, exp: dict, report: dict, tiles: list, what: str,
                  area: float) -> dict:
     summary = report.get("summary") or {}
     indexes = _flood_index(code, exp["bbox"])
@@ -726,7 +846,7 @@ def _asset_block(code: str, exp: dict, report: dict, aoi_bbox, what: str,
 
     return {
         "available": True,
-        "aoi": {"bbox": aoi_bbox, "covers": what, "km2": round(area, 1)},
+        "aoi": {"parts": tiles, "covers": what, "km2": round(area, 1)},
         "count": summary.get("asset_count") or len(items),
         "population_resident": float(summary.get("population_resident") or 0),
         "people_estimate": float(summary.get("people_estimate") or 0),
