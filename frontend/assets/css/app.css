@@ -32,6 +32,8 @@
   --cta: #E8E8E8;
   --cta-text: #324836;
   --cta-hover: #baf24a;
+  --cta-orange: #D65B00;
+  --cta-orange-hover: #EE6A0A;
   --lime: #baf24a;
   --link: #A6E22E;
 
@@ -302,8 +304,8 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   color: var(--cream);
 }
 
+.cta-block { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
 .cta {
-  margin-top: 8px;
   box-sizing: border-box;
   width: 100%;
   padding: 16px;
@@ -311,15 +313,16 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   font-family: var(--font-body);
   font-weight: 700;
   font-size: 16px;
-  color: var(--cta-text);
+  color: var(--cream);
   border-radius: 14px;
   border: none;
   cursor: pointer;
   transition: background .15s;
-  background-color: var(--cta);
+  background-color: var(--cta-orange);
 }
-.cta:hover { background: var(--cta-hover); }
+.cta:hover { background: var(--cta-orange-hover); }
 .cta:disabled { opacity: 0.7; cursor: progress; }
+.cta-note { margin: 0; text-align: center; font-size: 13px; line-height: 1.4; color: var(--cream-62); }
 
 /* ============================================================ Risk report */
 .view-report {

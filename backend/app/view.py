@@ -307,7 +307,7 @@ def headline(tiles: list[dict]) -> dict:
     scored = sorted((r for r in tiles if r["score"] is not None), key=lambda r: -r["score"])
     worth = [r for r in scored if r["score"] >= WORTH]
     calm = [r for r in scored if r["score"] < WORTH]
-    title = (f"{COUNT_WORDS[len(worth)]} worth preparing for at this home." if worth
+    title = (f"{COUNT_WORDS[len(worth)]} worth preparing for at your home." if worth
              else "Nothing here calls for special preparation.")
     groups: list[tuple[str, list[dict]]] = []
     for r in worth:

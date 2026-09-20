@@ -100,7 +100,7 @@ async function sendRecording(blob) {
     const text = res.text.replace(/[.。]+$/, "");
     $("#address").value = text;
     $("#address").focus();
-    message(`Heard: “${text}”. Check it, then press See risks.`);
+    message(`Heard: “${text}”. Check it, then press Check my risk.`);
     fetchSuggestions(text);
   } catch (err) {
     message(`Voice input failed: ${err.message}`, true);
