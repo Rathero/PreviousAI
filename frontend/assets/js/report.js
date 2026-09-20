@@ -229,10 +229,16 @@ function tileHtml(key, risk) {
     </button>`;
 }
 
+// Worst first: the tiles read in the same order as their width. Ties and the
+// loading state keep ORDER, so nothing jumps before the scores arrive.
+function tileOrder(byKey) {
+  return ORDER.slice().sort((a, b) => grow(byKey[b]) - grow(byKey[a]));
+}
+
 function renderTiles() {
   const byKey = Object.fromEntries(((data && data.risks) || []).map((r) => [r.key, r]));
   // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
-  setHtml($("#tiles"), ORDER.map((k) => tileHtml(k, byKey[k])).join(""));
+  setHtml($("#tiles"), tileOrder(byKey).map((k) => tileHtml(k, byKey[k])).join(""));
 }
 
 // ------------------------------------------------------------------ detail card
