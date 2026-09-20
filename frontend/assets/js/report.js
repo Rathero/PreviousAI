@@ -179,7 +179,7 @@ function stopProgress() {
 function heroLoading() {
   stopProgress();
   let i = 0;
-  $("#heroTitle").textContent = "Looking at this home…";
+  $("#heroTitle").textContent = "Checking flood, fire, avalanche and heat data for your area…";
   $("#heroText").textContent = PROGRESS[0];
   progressTimer = setInterval(() => {
     i = (i + 1) % PROGRESS.length;
