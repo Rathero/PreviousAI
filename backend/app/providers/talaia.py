@@ -60,7 +60,8 @@ def bbox_polygon(bbox: list[float] | tuple[float, ...]) -> dict:
 
 
 async def exposure(aoi: dict, *, layers: list[str] | None = None, buffer_m: float = 0,
-                   max_assets: int = 2000, cache_key: str | None = None) -> dict:
+                   max_assets: int = 2000, population_grid: bool = False,
+                   cache_key: str | None = None) -> dict:
     """Everything of value inside the AOI, with its people and its replacement cost.
 
     Returns TALAIA's report as it comes, plus `ok`. A refusal (no key, area over the
@@ -80,6 +81,10 @@ async def exposure(aoi: dict, *, layers: list[str] | None = None, buffer_m: floa
         "aoi": aoi,
         "include_assets": True,
         "include_population": True,
+        # The cells, not only the total. The total is the population of the area ASKED
+        # about, which for a flood zone strung along a river is most of the town; the
+        # cells are what lets the caller apportion it to the ground that floods.
+        "include_population_grid": population_grid,
         "include_networks": False,
         "include_geometry": False,
         "conflate": True,

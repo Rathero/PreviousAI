@@ -78,8 +78,11 @@ MITECO_WFS = "https://gis.miteco.gob.es/geoserver/agua/ows"
 FORAL = {"01", "20", "31", "48"}
 PROVINCES = [f"{i:02d}" for i in range(1, 53) if f"{i:02d}" not in FORAL]
 
-# A public government server. One request at a time, with a pause between them.
+# A public government server. One request at a time, with a pause between them. The
+# screen's pause is shorter because its request is: `resultType=hits` returns 510 bytes
+# and no geometry, against the megabytes a real query pulls.
 PAUSE = 0.7
+SCREEN_PAUSE = 0.15
 TIMEOUT = 180.0
 
 HEADERS = {"User-Agent": config.USER_AGENT}
@@ -113,14 +116,14 @@ def decode(raw: bytes) -> str:
 
 
 def fetch(client: httpx.Client, url: str, *, params=None, cache: Path | None = None,
-          binary: bool = False):
+          binary: bool = False, pause: float | None = None):
     """One request, cached on disk. Raw downloads are kept so a re-run is free."""
     if cache and cache.exists():
         raw = cache.read_bytes()
         return raw if binary else decode(raw)
     resp = client.get(url, params=params)
     resp.raise_for_status()
-    time.sleep(PAUSE)
+    time.sleep(PAUSE if pause is None else pause)
     if cache:
         cache.parent.mkdir(parents=True, exist_ok=True)
         cache.write_bytes(resp.content)
@@ -380,6 +383,77 @@ def build_catalonia() -> None:
 
 
 # --------------------------------------------------------------------------- #
+# screen: which municipalities have any mapped flood zone at all
+# --------------------------------------------------------------------------- #
+
+HITS_RE = re.compile(r'number(?:OfFeatures|Matched)="(\d+)"')
+
+# Enough to tell "nothing mapped here" from "something mapped here", and to order the
+# something. The preferential flow zone is the severe one and T500 the most inclusive:
+# a town with no T500 polygon over it has no mapped river flooding at all.
+SCREEN_LAYERS = {"zfp": "agua:ZI_Laminas_ZFP", "t100": "agua:Zi_laminas_q100",
+                 "t500": "agua:Zi_laminas_q500"}
+# What one hit of each layer is worth when ordering which towns to look at properly.
+SCREEN_WEIGHT = {"zfp": 5, "t100": 3, "t500": 1}
+
+
+def screen_municipality(client: httpx.Client, muni: dict) -> dict | None:
+    """How many official flood polygons touch this town, without downloading any.
+
+    `resultType=hits` makes the WFS answer with a count and no geometry: 510 bytes and
+    a tenth of a second, against the megabytes and the half minute a real query costs.
+    It cannot say how many buildings are exposed - that needs the polygons and the
+    cadastre - but it can say that nothing is mapped here, which for a dry inland
+    village is the whole answer and is worth saying instead of "not counted yet".
+    """
+    bbox = muni.get("bbox")
+    if not bbox:
+        return None
+    w, s, e, n = bbox
+    out = {}
+    for key, layer in SCREEN_LAYERS.items():
+        params = {"service": "WFS", "version": "1.1.0", "request": "GetFeature",
+                  "typeName": layer, "resultType": "hits",
+                  "CQL_FILTER": f"BBOX(shape,{w},{s},{e},{n},'EPSG:4326')"}
+        try:
+            text = fetch(client, MITECO_WFS, params=params, pause=SCREEN_PAUSE,
+                         cache=RAW / "screen" / f"{muni['code']}_{key}.xml")
+        except httpx.HTTPError:
+            return None
+        m = HITS_RE.search(text or "")
+        if not m:
+            return None
+        out[key] = int(m.group(1))
+    return out
+
+
+def build_screen(client: httpx.Client, munis: list[dict]) -> None:
+    data = load_universe()
+    index = {m["code"]: m for m in data["municipalities"]}
+    done = empty = failed = 0
+    started = time.time()
+    for i, muni in enumerate(munis, start=1):
+        hits = screen_municipality(client, muni)
+        if hits is None:
+            failed += 1
+            continue
+        row = index[muni["code"]]
+        row["flood_screen"] = hits
+        row["flood_screen_rank"] = sum(SCREEN_WEIGHT[k] * min(v, 20) for k, v in hits.items())
+        done += 1
+        if not row["flood_screen_rank"]:
+            empty += 1
+        if i % 250 == 0:
+            rate = i / max(1e-9, time.time() - started)
+            log(f"  {i}/{len(munis)} screened ({rate:.1f}/s, "
+                f"{(len(munis) - i) / rate / 60:.0f} min left)")
+            analysis.write(analysis.MUNICIPALITIES, data)  # so a stop loses little
+    analysis.write(analysis.MUNICIPALITIES, data)
+    log(f"screen: {done} municipalities, {empty} with nothing mapped over them, "
+        f"{failed} unreachable, in {(time.time() - started) / 60:.0f} min")
+
+
+# --------------------------------------------------------------------------- #
 # exposure: the cadastre's buildings against the official flood zones
 # --------------------------------------------------------------------------- #
 
@@ -432,6 +506,18 @@ def parse_buildings(gml: str) -> list[dict]:
             "condition": cond.group(1).strip() if cond else None,
         })
     return out
+
+
+def cached_buildings(code: str) -> list[dict]:
+    """The municipality's buildings from the zip already on disk. Never the network."""
+    path = RAW / f"bu_{code}.zip"
+    if not path.exists():
+        return []
+    with zipfile.ZipFile(path) as zf:
+        name = next((n for n in zf.namelist() if n.endswith("building.gml")), None)
+        if not name:
+            return []
+        return parse_buildings(zf.read(name).decode("ISO-8859-1", errors="replace"))
 
 
 def download_buildings(client: httpx.Client, muni: dict) -> list[dict]:
@@ -699,7 +785,8 @@ def build_assets(codes: list[str], *, force: bool = False) -> None:
         parts, failed = [], []
         for tile in tiles:
             part = asyncio.run(talaia.exposure(
-                talaia.bbox_polygon(tile), cache_key=f"{code}:{tile}"))
+                talaia.bbox_polygon(tile), population_grid=True,
+                cache_key=f"{code}:{tile}:grid"))
             if part.get("ok"):
                 parts.append(part)
             else:
@@ -713,15 +800,90 @@ def build_assets(codes: list[str], *, force: bool = False) -> None:
         if failed:
             report["warnings"].append(
                 f"{len(failed)} of {len(tiles)} parts failed: {failed[0]}")
-        exp["assets"] = _asset_block(code, exp, report, tiles, what, area)
+        cells = ((report.get("population") or {}).get("cells")) or []
+        exp["assets"] = _asset_block(code, exp, report, tiles, what, area,
+                                     _residents_in_zone(code, exp, cells))
         analysis.write(analysis.EXPOSURE_DIR / f"{code}.json.gz", exp)
         a = exp["assets"]
+        zone_pop = a.get("population_in_zone")
         log(f"  {code} {exp['name']}: {a['count']} assets, "
-            f"{a['population_resident']:.0f} residents in the area, "
             f"{a['in_flood_zone']['count']} of them inside a flood zone "
-            f"({a['in_flood_zone']['people']:.0f} people at capacity)")
+            f"({a['in_flood_zone']['people']:.0f} people at capacity); "
+            + (f"{zone_pop:,} residents on the ground that floods"
+               if zone_pop is not None else
+               f"{a['population_area']:,.0f} residents in the area asked about, "
+               "not apportioned"))
         done += 1
     log(f"assets: {done} municipalities, {skipped} skipped")
+
+
+def _residents_in_zone(code: str, exp: dict, cells: list[dict]) -> dict | None:
+    """The residents of the ground that floods, not of the area we happened to ask about.
+
+    TALAIA's population total is the census grid weighted to the AOI, and the AOI is a
+    box (or a few) around the exposed buildings. For a flood zone that follows a river
+    through a city those boxes cover most of the city: València came back with 938,408
+    residents "at risk" next to 1,101 flooded dwellings, which is the population of
+    València. The total is right for what it measures and wrong for what the column
+    claims.
+
+    So each 1 km census cell is apportioned by the dwellings inside it: what share of
+    that cell's homes stand in a flood zone. The cadastre has every building of the
+    municipality with its coordinates and its dwelling count, and it is already on disk,
+    so this costs nothing but the read.
+
+        residents in zone = SUM over cells of  population * exposed dwellings
+                                               ------------------------------
+                                               all dwellings in the same cell
+
+    It assumes people are spread across a cell the way dwellings are, which is the
+    standard dasymetric assumption and is the reason the figure is reported as an
+    estimate. Where a cell has census population but no cadastral dwellings at all
+    (Basque enclaves, bad geometry) it contributes nothing rather than everything.
+    """
+    buildings = cached_buildings(code)
+    if not buildings or not cells:
+        return None
+
+    # One cell size for the whole town - they are all at the same latitude - so a
+    # building can be put in its cell by arithmetic instead of a scan. The lattice is
+    # anchored on a real cell centroid: the INE grid is regular in metres (EPSG:3035),
+    # not in degrees, so a lattice starting from zero sits offset from it and drops
+    # buildings near the cell edges into cells that were never returned. Anchoring
+    # takes València from 97.8 % of its dwellings landing in a cell to 99.1 %.
+    step = math.sqrt(max(0.25, min(4.0, float(cells[0].get("area_km2") or 1.0))))
+    mid = sum(c["lat"] for c in cells) / len(cells)
+    dlat = step / 110.574
+    dlon = step / (111.320 * max(0.2, math.cos(math.radians(mid))))
+    lat0 = min(c["lat"] for c in cells)
+    lon0 = min(c["lon"] for c in cells)
+    key = lambda lat, lon: (round((lat - lat0) / dlat),  # noqa: E731
+                            round((lon - lon0) / dlon))
+
+    grid = {key(c["lat"], c["lon"]): {"cell": c, "all": 0.0, "exposed": 0.0}
+            for c in cells}
+
+    exposed_refs = {b["ref"] for b in (exp.get("exposed") or []) if b.get("ref")}
+    for b in buildings:
+        dw = float(b.get("dwellings") or 0)
+        slot = grid.get(key(b["lat"], b["lon"])) if dw else None
+        if slot is None:
+            continue
+        slot["all"] += dw
+        if b["ref"] in exposed_refs:
+            slot["exposed"] += dw
+
+    residents = 0.0
+    counted = 0
+    for slot in grid.values():
+        if slot["all"] <= 0 or slot["exposed"] <= 0:
+            continue
+        residents += float(slot["cell"].get("population") or 0) * slot["exposed"] / slot["all"]
+        counted += 1
+    return {"residents": round(residents), "cells_with_flooded_homes": counted,
+            "cells_in_area": len(grid),
+            "method": "1 km INE census cells apportioned by the share of each cell's "
+                      "cadastral dwellings that stand in a flood zone"}
 
 
 SUMMABLE = ("asset_count", "people_estimate", "people_from_registry",
@@ -747,14 +909,21 @@ def _merge_reports(parts: list[dict]) -> dict:
         p = parts[0]
         return {"summary": p.get("summary") or {}, "assets": p.get("assets") or [],
                 "assets_truncated": bool(p.get("assets_truncated")),
+                "population": p.get("population") or {},
                 "sources": p.get("sources") or [], "warnings": list(p.get("warnings") or []),
                 "generated_at": p.get("generated_at")}
 
     assets, seen, sources, warnings = [], set(), [], []
+    cells: dict[str, dict] = {}
     population = 0.0
     truncated = False
     for part in parts:
         population += float((part.get("summary") or {}).get("population_resident") or 0)
+        # A 1 km census cell can touch two tiles. Keep it once, with the whole-cell
+        # population: the apportionment below divides it by the cell's own dwellings,
+        # so a cell counted twice would count its residents twice.
+        for cell in ((part.get("population") or {}).get("cells") or []):
+            cells.setdefault(cell.get("cell_id") or f"{cell['lat']},{cell['lon']}", cell)
         for asset in part.get("assets") or []:
             key = (asset.get("name"), round(asset.get("lat") or 0, 6),
                    round(asset.get("lon") or 0, 6), asset.get("subcategory"))
@@ -796,6 +965,7 @@ def _merge_reports(parts: list[dict]) -> dict:
         "by_category": sorted(by_category.values(), key=lambda c: -c["count"]),
     }
     return {"summary": summary, "assets": assets, "assets_truncated": truncated,
+            "population": {"cells": list(cells.values()), "total": population},
             "sources": sources, "warnings": warnings,
             "generated_at": parts[0].get("generated_at")}
 
@@ -803,7 +973,7 @@ def _merge_reports(parts: list[dict]) -> dict:
 # What an institution is called out for: a school, a care home, a hospital, a campsite.
 # `hazardous` and `response` come from TALAIA's own flags.
 def _asset_block(code: str, exp: dict, report: dict, tiles: list, what: str,
-                 area: float) -> dict:
+                 area: float, apportioned: dict | None = None) -> dict:
     summary = report.get("summary") or {}
     indexes = _flood_index(code, exp["bbox"])
     order = sorted(indexes, key=lambda k: -scoring.FLOOD_ZONE_SCORES.get(k, 0))
@@ -848,7 +1018,12 @@ def _asset_block(code: str, exp: dict, report: dict, tiles: list, what: str,
         "available": True,
         "aoi": {"parts": tiles, "covers": what, "km2": round(area, 1)},
         "count": summary.get("asset_count") or len(items),
-        "population_resident": float(summary.get("population_resident") or 0),
+        # Two different questions, kept apart on purpose: how many people live in the
+        # area asked about, and how many live on the ground that floods.
+        "population_area": float(summary.get("population_resident") or 0),
+        "population_in_zone": (apportioned or {}).get("residents"),
+        "population_method": (apportioned or {}).get("method"),
+        "population_cells": (apportioned or {}).get("cells_with_flooded_homes"),
         "people_estimate": float(summary.get("people_estimate") or 0),
         "people_from_registry": float(summary.get("people_from_registry") or 0),
         "total_value_eur": float(summary.get("total_value_eur") or 0),
@@ -992,15 +1167,18 @@ def build_ranking() -> dict:
             if assets.get("available"):
                 inside = assets["in_flood_zone"]
                 row["exposure"].update({
-                    "population": assets["population_resident"],
+                    "population": assets.get("population_in_zone"),
+                    "population_area": assets.get("population_area"),
                     "institutions": inside["count"],
                     "institution_people": inside["people"],
                     "value_eur": inside["value_eur"],
                     "hazardous": assets["hazardous"],
                 })
-                # Residents of the flooded area, apportioned from the census grid. The
-                # dwelling count says how many homes; this says how many people.
-                row["people_at_risk"] = round(assets["population_resident"])
+                # Residents of the ground that floods, apportioned from the census
+                # grid by where the flooded dwellings are. NOT the population of the
+                # area we asked about, which for a river through a city is the city.
+                if assets.get("population_in_zone") is not None:
+                    row["people_at_risk"] = round(assets["population_in_zone"])
         rows.append(row)
 
     payload = {
@@ -1066,8 +1244,17 @@ def pick(args, data: dict) -> list[dict]:
     """Which municipalities a run of --only exposure should cover.
 
     `--top N` means N municipalities that do not have one yet, not the N highest of
-    which twenty-nine are already on disk: the point of a second run is to widen the
+    which thirty are already on disk: the point of a second run is to widen the
     coverage. `--force` puts the built ones back in, to apply a change to the parser.
+
+    `--per-province` takes that many from EACH province instead of N overall, which is
+    how you get a ranking that covers the country without the two days and 0.7 TB a
+    full crawl of all 7,597 would take.
+
+    The order is the screen (`--only screen`) where it has run: how many official flood
+    polygons touch the town, weighted by severity. Before the screen, the only order
+    available is the overall score, which is driven by fire weather - a poor way to
+    choose where to look for flooding, and the build says so.
     """
     munis = data["municipalities"]
     if args.municipality:
@@ -1078,23 +1265,45 @@ def pick(args, data: dict) -> list[dict]:
     if not args.force:
         munis = [m for m in munis
                  if not (analysis.EXPOSURE_DIR / f"{m['code']}.json.gz").exists()]
-    ranked = analysis.read(analysis.RANKING)
-    if ranked:
-        order = {r["code"]: r["scores"].get("overall") or 0 for r in ranked["rows"]}
-        munis = sorted(munis, key=lambda m: -order.get(m["code"], 0))
+
+    screened = sum(1 for m in munis if m.get("flood_screen_rank") is not None)
+    if screened:
+        # Nothing mapped over the town means nothing to count: skip it outright.
+        munis = [m for m in munis if m.get("flood_screen_rank", 1) > 0]
+        order = lambda m: -(m.get("flood_screen_rank") or 0)  # noqa: E731
+    else:
+        log("  no screen on disk: ordering by the overall score, which is mostly fire "
+            "weather. Run --only screen first to choose by mapped flood risk.")
+        ranked = analysis.read(analysis.RANKING) or {"rows": []}
+        scores = {r["code"]: r["scores"].get("overall") or 0 for r in ranked["rows"]}
+        order = lambda m: -scores.get(m["code"], 0)  # noqa: E731
+
+    munis = sorted(munis, key=order)
+    if args.per_province:
+        out, seen = [], {}
+        for m in munis:
+            pp = m["province_code"]
+            if seen.get(pp, 0) >= args.per_province:
+                continue
+            seen[pp] = seen.get(pp, 0) + 1
+            out.append(m)
+        return out
     return munis[:args.top]
 
 
 def main() -> None:
     p = argparse.ArgumentParser(description=__doc__,
                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument("--only", choices=["universe", "climate", "catalonia", "exposure",
-                                      "assets", "heat", "ranking"], action="append")
+    p.add_argument("--only", choices=["universe", "climate", "catalonia", "screen",
+                                      "exposure", "assets", "heat", "ranking"],
+                   action="append")
     p.add_argument("--municipality", action="append",
                    help="cadastral code, e.g. 46188 (Paiporta). Repeatable.")
     p.add_argument("--province", help="two-digit province code, e.g. 46")
     p.add_argument("--top", type=int, default=10,
                    help="how many municipalities --only exposure covers (default 10)")
+    p.add_argument("--per-province", type=int, default=None,
+                   help="take this many from EACH province instead of --top overall")
     p.add_argument("--force", action="store_true", help="rebuild what is already on disk")
     args = p.parse_args()
 
@@ -1107,6 +1316,15 @@ def main() -> None:
             build_climate()
         if "catalonia" in steps:
             build_catalonia()
+        if "screen" in steps:
+            data = load_universe()
+            todo = [m for m in data["municipalities"]
+                    if m.get("bbox") and (args.force or m.get("flood_screen") is None)]
+            if args.province:
+                todo = [m for m in todo if m["province_code"] == args.province]
+            log(f"screen: {len(todo)} municipalities to ask MITECO about "
+                f"(counts only, no geometry)")
+            build_screen(client, todo)
         if "exposure" in steps:
             data = load_universe()
             chosen = pick(args, data)

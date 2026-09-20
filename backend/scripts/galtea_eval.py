@@ -17,13 +17,13 @@ Two things live here and not in the web app, because the app has no message to a
 
     python backend/scripts/galtea_eval.py --ask "Is Paiporta safe from flooding?"
     python backend/scripts/galtea_eval.py                # runs the evaluation
-    python backend/scripts/galtea_eval.py --network      # let new places reach Open-Meteo
+    python backend/scripts/galtea_eval.py --network 0    # fetch nothing new at all
 
-A place whose ERA5 series is not on disk is answered from the catalogues instead of
-being fetched: one new point costs a good part of Open-Meteo's daily free tier (see
-prewarm.py). A series saved within the last 30 days, or one saved within a kilometre at
-the same height, is free and is used - that is the same rule `open_meteo.fetch_archive`
-follows. --network lifts the guard.
+A series saved within the last 30 days, or one saved within a kilometre at the same
+height, is free and is used - the same rule `open_meteo.fetch_archive` follows. Beyond
+those, a run fetches at most --network new points (three by default), because one new
+point costs a good part of Open-Meteo's daily free tier (see prewarm.py); the rest of
+the places are answered from the catalogues, saying so.
 
 `GALTEA_API_KEY` comes from `.env.local` at the repo root (git-ignored), or from the
 environment.
@@ -46,15 +46,18 @@ sys.path.insert(0, str(ROOT / "backend"))
 # Explicit UTF-8: the Windows console uses cp1252 and chokes on "→" or "·".
 sys.stdout.reconfigure(encoding="utf-8", errors="replace", line_buffering=True)
 
-from app import cache, grants, interpret, narrative, protection, view  # noqa: E402
+from app import cache, demo, grants, interpret, narrative, protection, view  # noqa: E402
+from app.hazards import MONTHS_EN  # noqa: E402
 from app import report as R  # noqa: E402
 from app.providers import ai, geocoding, open_meteo  # noqa: E402
 
 PRODUCT_ID = "product_h92bl1271vvp1o5v1hwvau7c"
 VERSION_ID = "version_l0aqugj8ok9kzv9f20dic4wk"
 
-# A place whose climate record is not already on disk is not fetched unless the run says so.
-ALLOW_NETWORK = False
+# New climate points this run may fetch. One point costs a good part of Open-Meteo's
+# free tier, so the rest of the places are answered from the catalogues instead.
+NETWORK_BUDGET = 3
+FETCHED = set()
 
 MAX_ADVICE = 4
 MAX_CATALOGUE = 4
@@ -68,8 +71,9 @@ POLL_LIMIT = 80  # twenty minutes: the judges queue server-side
 # --------------------------------------------------------------------------- #
 GATE = {
     "event_probability": (
-        "The message asks how likely it is that a fire, flood, heatwave or avalanche will "
-        "actually reach this particular home, or asks to predict a future event there.",
+        "The message asks for the odds, the chance or the percentage that a fire, flood, "
+        "heatwave or avalanche will actually reach this particular home, or asks to predict "
+        "whether one will happen there.",
         "This report does not give the probability that an event reaches a specific home. It "
         "carries measured and mapped hazard data for the point, each figure with the period it "
         "covers and the scale it was measured at."),
@@ -101,21 +105,29 @@ GATE = {
         "emergency services say: they decide, not this report. What follows describes the "
         "hazard at the address, which is a different question."),
 }
-GATE_MIN = 0.5
+# Asking for levels reads as asking for a prediction often enough that this one question
+# needs more than a coin flip before it speaks over the data.
+GATE_MIN = {"event_probability": 0.75}
+GATE_DEFAULT = 0.5
 
 
 async def out_of_scope(message: str) -> list[str]:
     """The typed questions that decide what has to be said before any data."""
     if not ai.available():
         return []
-    questions = {key: ai.noul(text) for key, (text, _) in GATE.items()}
+    questions = {key: ai.noul(
+        text,
+        true="The message asks for exactly that",
+        false="The message asks for the hazard levels, the data, the history, the sources or "
+              "what to prepare at a place, which is what this report answers")
+        for key, (text, _) in GATE.items()}
     try:
         result = await ai.ask({"message": message[:MAX_ASK]}, questions)
     except ai.AIUnavailable:
         return []  # without the AI the product falls back to code, and says less
     answers = result["answers"]
     return [GATE[key][1] for key in GATE
-            if (answers.get(key) or {}).get("noul", 0) >= GATE_MIN]
+            if (answers.get(key) or {}).get("noul", 0) >= GATE_MIN.get(key, GATE_DEFAULT)]
 
 
 # --------------------------------------------------------------------------- #
@@ -157,11 +169,41 @@ def _tile_lines(tile: dict) -> list[str]:
     return lines
 
 
+def understood_lines(report: dict) -> list:
+    """What the AI read the request as, with its probabilities: the typed decisions.
+
+    The product keeps them in `report["interpretation"]` and the app shows them. A request
+    that names a month and never hears it back cannot tell whether it was read at all.
+    """
+    u = report.get("interpretation") or {}
+    if not u:
+        return []
+    lines = ["What this request was read as (each decision typed, with its probability):",
+             f"- place: \"{u['place'].get('used') or u['place']['query']}\" "
+             f"({u['place']['confidence']})",
+             f"- mode: {u['mode']['value']} ({u['mode']['confidence']}, {u['mode']['source']})"]
+    if u.get("months"):
+        lines.append("- months read: " + ", ".join(MONTHS_EN[m - 1] for m in u["months"]))
+    if u.get("trip"):
+        lines.append(f"- dates: {u['trip'][0]} to {u['trip'][1]}")
+    # A home report drops the dates (it covers the whole year), so the words themselves are
+    # echoed: a request that names July and never hears it back cannot tell it was read.
+    named = [w for w in (_clean(x) for x in u["text"].split())
+             if w and {w} & interpret._TIME_WORDS]
+    if named and not u.get("months"):
+        lines.append(f"- dates named in the request: {', '.join(dict.fromkeys(named))}")
+    for item in u.get("profile") or []:
+        lines.append(f"- household: {item['label']} ({item['probability']})")
+    lines += [f"- {note}" for note in u.get("notes") or []]
+    return lines + [""]
+
+
 def compose(report: dict) -> str:
     """The app's own view, read out: headline, the four risks, the advice, the caveats."""
     page = view.app_view(report)
     overall = report["overall"]
-    lines = [f"{report['location']['label']} - overall natural hazard risk "
+    lines = understood_lines(report)
+    lines += [f"{report['location']['label']} - overall natural hazard risk "
              f"{overall['score']:.0f}/100 ({overall['level']}).",
              page["headline"]["title"], page["headline"]["text"], ""]
 
@@ -197,26 +239,70 @@ def compose(report: dict) -> str:
     return "\n".join(line for line in lines if line is not None).strip()
 
 
-def _score_text(text: str, haystack: str) -> int:
+# What a message is about, in the words people use for it. The catalogue answers only
+# from the families the message names: a question about flooding that comes back with
+# avalanche advice is what one judge called "not scenario-appropriate", and it was right.
+FAMILY_WORDS = {
+    "flood": ("flood", "water", "rain", "downpour", "storm", "river", "sea", "drain",
+              "inunda", "agua", "lluvia", "riada", "barranco", "dana", "aiguat", "riu"),
+    "wildfire": ("fire", "wildfire", "forest", "burn", "smoke", "ember", "brush", "vegetation",
+                 "incendi", "incendio", "fuego", "foc", "bosque", "humo", "brasa"),
+    "heat": ("heat", "hot", "warm", "temperature", "tropical night", "summer",
+             "calor", "caluros", "temperatura", "verano", "estiu", "nit tropical"),
+    "avalanche": ("avalanche", "snow", "ski", "slope", "mountain", "winter",
+                  "alud", "avalancha", "nieve", "esqui", "allau", "neu", "muntanya"),
+}
+CARD_FAMILY = {card: family for family, spec in protection.FAMILIES.items()
+               for card in spec["cards"]}
+
+
+def families_named(message: str) -> set:
+    text = message.lower()
+    return {family for family, words in FAMILY_WORDS.items() if any(w in text for w in words)}
+
+
+MONEY_WORDS = ("grant", "subsid", "deduction", "tax", "pay", "cost", "price", "money", "fund",
+               "ayuda", "subvenc", "deducc", "pagar", "coste", "dinero", "precio")
+
+
+def _score_text(text: str, haystack: str) -> float:
+    """Words shared with the message, against the length of the item.
+
+    Unnormalised, the longest entries in the catalogue win every question, which is how a
+    flooding question came back with three pages of energy-efficiency deductions.
+    """
     words = {w for w in "".join(c.lower() if c.isalnum() else " " for c in text).split()
              if len(w) > 3}
-    hay = "".join(c.lower() if c.isalnum() else " " for c in haystack).split()
-    return sum(1 for w in set(hay) if w in words)
+    hay = {w for w in "".join(c.lower() if c.isalnum() else " " for c in haystack).split()
+           if len(w) > 3}
+    if not hay:
+        return 0.0
+    return sum(1 for w in hay if w in words) / len(hay) ** 0.5
 
 
 def from_catalogues(message: str, reason: str) -> str:
     """No report to answer from: answer only from what is written down, and say so."""
-    pool = [(text, "advice") for texts in narrative.ADVICE.values() for text in texts]
-    pool += [(item["text"], "advice") for item in narrative.PROFILE_ADVICE]
-    pool += [(f"{m['title']}. {m['why']} Cost: {m['cost'] or 'free'}.", "measure")
+    wanted = families_named(message)
+    pool = [(text, CARD_FAMILY.get(card)) for card, texts in narrative.ADVICE.items()
+            for text in texts]
+    pool += [(item["text"], CARD_FAMILY.get((item["hazards"] or [None])[0]))
+             for item in narrative.PROFILE_ADVICE]
+    pool += [(f"{m['title']}. {m['why']} Cost: {m['cost'] or 'free'}.", m["family"])
              for m in protection.MEASURES]
-    pool += [(f"{p['name']} ({p['body']}): {p['funds']} Amount: {p['amount']}", "public money")
-             for p in grants.PROGRAMMES]
+    # Public money only when the message asks about money: otherwise a question about what
+    # to do comes back with tax deductions.
+    if any(w in message.lower() for w in MONEY_WORDS):
+        pool += [(f"{p['name']} ({p['body']}): {p['funds']} Amount: {p['amount']}",
+                  (p.get("families") or [None])[0]) for p in grants.PROGRAMMES]
+    if wanted:
+        pool = [item for item in pool if item[1] in wanted]
     best = [item for item in sorted(pool, key=lambda i: -_score_text(i[0], message))
             if _score_text(item[0], message) > 0][:MAX_CATALOGUE]
     lines = [reason]
     if best:
-        lines += ["", "What this product can say without it, from its written catalogue:"]
+        named = ", ".join(sorted(wanted)) if wanted else "the hazards it covers"
+        lines += ["", f"What this product can say without it, from its written catalogue "
+                      f"for {named}:"]
         lines += [f"- {text}" for text, _ in best]
     lines += ["", "A score, a level or anything about the hazards at a specific address comes "
                   "from official and scientific data for that point, and is never guessed from "
@@ -234,16 +320,104 @@ def user_turns(messages: list) -> list:
     return out
 
 
+def _clean(word: str) -> str:
+    return "".join(c for c in word.lower() if c.isalnum())
+
+
+def _words(text: str) -> set:
+    return {"".join(c for c in word if c.isalnum()) for word in text.lower().split()}
+
+
 def request_text(turns: list) -> str:
-    """The newest turn, with the earlier ones behind it: "and the kids?" carries no address."""
+    """The question, plus the turns that carry the address and the date.
+
+    A conversation says the address once, at the start, and the month somewhere in the
+    middle: a window over the newest turns loses both, and the report is then built for
+    nowhere and for no month. `interpret._TIME_WORDS` is the product's own list of what
+    reads as a date, in the three languages it accepts.
+    """
     if not turns:
         return ""
-    text = turns[-1]
-    for earlier in reversed(turns[:-1]):
-        if len(text) + len(earlier) + 1 > MAX_ASK:
-            break
-        text = f"{text} {earlier}"
-    return text[:MAX_ASK]
+    priority = [len(turns) - 1, 0]
+    priority += [i for i, turn in enumerate(turns) if _words(turn) & interpret._TIME_WORDS]
+    priority += list(range(len(turns) - 1, -1, -1))
+    chosen, used = set(), 0
+    for i in priority:
+        if i in chosen or used + len(turns[i]) + 1 > MAX_ASK:
+            continue
+        chosen.add(i)
+        used += len(turns[i]) + 1
+    if not chosen:
+        return turns[-1][:MAX_ASK]
+    return " ".join(turns[i] for i in sorted(chosen))[:MAX_ASK]
+
+
+# The country is in every Spanish label, so a span that shares only that shares nothing:
+# "Villa Inventada del Sol, Spain" matched Calvià on the word "Spain" alone.
+COUNTRY_WORDS = {"spain", "espana", "espanya", "es", "france", "francia", "andorra",
+                 "portugal", "usa", "united", "states"}
+
+
+def matches(span: str, place: dict) -> bool:
+    """Whether the resolved place carries a word the request actually wrote.
+
+    A geocoder answers something for almost anything: "Villa Inventada del Sol, Spain"
+    came back as Calvià, a real town the request never named, and a report built for it
+    would be a report about somewhere else entirely. `demo.normalise` is the product's
+    own way of comparing what someone typed with what an address service returns.
+    """
+    label = set(demo.normalise(place.get("label") or "").split())
+    words = {w for w in demo.normalise(span).split()
+             if len(w) >= 3 and w not in interpret._EDGE_WORDS
+             and w not in interpret._TIME_WORDS and w not in COUNTRY_WORDS}
+    return bool(words & label)
+
+
+def _trims(span: str) -> list:
+    """The span with its leading words dropped one at a time: "flat in Paiporta" -> "Paiporta".
+
+    Only from the front. Dropping words off the end turns "Villa Inventada del Sol" into
+    "Villa", which some geocoder somewhere will happily answer with a real place that the
+    request never named.
+    """
+    words = span.split()
+    return [" ".join(words[i:]) for i in range(1, len(words))][:3]
+
+
+async def find_place(message: str, turns: list):
+    """The request as read by the AI, and the place it names - looked for turn by turn.
+
+    One span wins among the candidates of the whole text, so an address that lost to a
+    longer phrase can still win when its own turn is read alone.
+    """
+    understood = await interpret.run(message)
+    try:
+        place, used = await interpret.resolve_place(understood)
+        if matches(used, place):
+            return understood, place, used, "ask"
+    except geocoding.GeocodingError:
+        pass
+    for turn in dict.fromkeys([turns[0], turns[-1]] if turns else []):
+        if turn == message:
+            continue
+        try:
+            alone = await interpret.run(turn)
+            place, used = await interpret.resolve_place(alone)
+            if matches(used, place):
+                return understood, place, used, "turn"
+        except geocoding.GeocodingError:
+            continue
+    # Last: the span the AI chose, trimmed. "flat in Paiporta" is the AI saying the place
+    # is in those three words, and the geocoder only knows the third one. Nothing outside
+    # the span is ever tried, so no place is invented that the request did not contain.
+    for span in _trims((understood["place"]["options"] or [{}])[0].get("text", "")):
+        try:
+            place = await geocoding.resolve(span)
+            if matches(span, place):
+                return understood, place, span, "span"
+        except geocoding.GeocodingError:
+            continue
+    return understood, None, None, None
 
 
 async def answer(messages: list) -> str:
@@ -254,22 +428,44 @@ async def answer(messages: list) -> str:
         return from_catalogues("", "No question was asked.")
 
     preamble = await out_of_scope(message)
-    understood = await interpret.run(message)
-    try:
-        place, used = await interpret.resolve_place(understood)
-    except geocoding.GeocodingError:
+    understood, place, used, via = await find_place(message, turns)
+    if place is None:
         body = from_catalogues(
             message,
             "No address or place was recognised in that message, so there is no report to "
             "answer from. Give the street, number and town.")
         return "\n\n".join(preamble + [body])
-    if not ALLOW_NETWORK and not climate_on_disk(place):
+
+    point = (round(float(place["latitude"]), 4), round(float(place["longitude"]), 4))
+    if not climate_on_disk(place):
+        if point not in FETCHED and len(FETCHED) >= NETWORK_BUDGET:
+            body = from_catalogues(
+                message,
+                f"The climate record for {place.get('label', used)} is not on this machine, and "
+                f"this run has already fetched the new places its quota allows, so no report "
+                f"can be built for it here.")
+            return "\n\n".join(preamble + [body])
+        FETCHED.add(point)
+
+    try:
+        if via == "ask":
+            report = await R.build_report(ask=message)
+        else:
+            # The product's own reading of the whole message does not reach this place, so
+            # the span that did is used, with what the AI read from the message around it.
+            report = await R.build_report(
+                query=used,
+                months=set(understood["months"]) if understood.get("months") else None,
+                profile=[p["key"] for p in understood.get("profile") or []])
+            understood["place"]["used"] = used
+            report["interpretation"] = understood
+    except Exception as exc:  # a place that cannot be built is answered, never crashed
         body = from_catalogues(
             message,
-            f"The climate record for {place.get('label', used)} is not on this machine and this "
-            f"run does not fetch new places, so no report can be built for it here.")
+            f"The report for {place.get('label', used)} could not be built here: "
+            f"{type(exc).__name__}. The data it needs did not answer, and a report is not "
+            f"guessed when its sources are missing.")
         return "\n\n".join(preamble + [body])
-    report = await R.build_report(ask=message)
     return "\n\n".join(preamble + [compose(report)])
 
 
@@ -323,14 +519,14 @@ def statuses(galtea, version_id: str) -> dict:
 
 
 def main() -> int:
-    global ALLOW_NETWORK
+    global NETWORK_BUDGET
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--ask", nargs="+", help="answer one conversation locally, oldest turn first")
-    parser.add_argument("--network", action="store_true",
-                        help="let a place whose climate record is not on disk reach Open-Meteo")
+    parser.add_argument("--network", type=int, default=NETWORK_BUDGET, metavar="N",
+                        help="new climate points this run may fetch from Open-Meteo (0 fetches none)")
     parser.add_argument("--version-id", default=VERSION_ID)
     args = parser.parse_args()
-    ALLOW_NETWORK = args.network
+    NETWORK_BUDGET = args.network
 
     if args.ask:
         messages = [{"role": "user", "content": turn} for turn in args.ask]
