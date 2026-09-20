@@ -121,6 +121,13 @@ GOOGLE_MAPS_KEY = _env("GOOGLE_MAPS_API_KEY")
 FIRMS_KEY = _env("FIRMS_MAP_KEY")
 FORECAST_PROVIDER = _env("FORECAST_PROVIDER", "ecmwf-aifs")
 
+# --- TALAIA (what stands inside a polygon) -------------------------------------------
+# Only the national analysis uses it, and only in batch: it answers for an AREA, which
+# is the question /analisis asks and the report never does. Without a key the analysis
+# is built exactly as before, without the asset inventory.
+TALAIA_URL = _env("TALAIA_URL", "https://talaia.up.railway.app")
+TALAIA_KEY = _env("TALAIA_API_KEY")
+
 # --- Devin (autonomous engineering layer) --------------------------------------------
 # Devin writes code on a branch; the gate (backend/autonomy/) decides whether it is
 # admitted. Devin never produces or changes a number in a report.

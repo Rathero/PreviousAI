@@ -19,7 +19,8 @@ from pydantic import BaseModel, Field
 from . import (analysis, autonomy_store, briefing, cache, claims, config, demo, dwelling as DW,
                interpret, mapping, media, pdf_report, protection, report as R, scoring, video,
                view)
-from .providers import ai, cds, cds_baseline, fal, geocoding, miteco, open_meteo, streetview
+from .providers import (ai, cds, cds_baseline, fal, geocoding, miteco, open_meteo, streetview,
+                        talaia)
 
 # Recommended by Norma — fixed with Claude Opus 5 via Claude Code
 # Why there is no database behind this service, deliberately: one process, one disk.
@@ -77,6 +78,7 @@ async def health():
             "ffmpeg": video.available(),
         },
         "demo": demo.status(),
+        "talaia": talaia.status(),
     }
 
 
