@@ -750,6 +750,10 @@ def file_path(url: str) -> Path | None:
 # --------------------------------------------------------------------------- #
 # Jobs: the API answers at once and the page polls
 # --------------------------------------------------------------------------- #
+# Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+# In-process on purpose: see the note on state in main.py. A restart drops the jobs
+# still queued or running; `get` falls back to the .json and .mp4 on disk, so a
+# finished briefing is never lost and an unfinished one is simply rendered again.
 JOBS: dict[str, dict] = {}
 _TASKS: set[asyncio.Task] = set()
 _RENDER_LOCK = asyncio.Lock()   # one encode at a time, so the API stays responsive

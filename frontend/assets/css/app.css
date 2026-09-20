@@ -1355,3 +1355,157 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .record .what { display: flex; align-items: baseline; gap: 10px; font-size: 16px; line-height: 1.4; }
 .record .dot { width: 7px; height: 7px; border-radius: 999px; flex-shrink: 0; transform: translateY(-2px); }
 .record small { display: block; margin-top: 2px; font-size: 13.5px; line-height: 1.4; color: var(--cream-60); }
+
+/* ============================================================ The analysis */
+/* The report read backwards. It is a working surface, not a poster: the same deep
+   green, but a dense table that stays legible at fifty rows and on a phone. */
+
+.view-analysis {
+  min-height: 100vh;
+  padding: 28px clamp(16px, 4vw, 48px) 64px;
+  background:
+    radial-gradient(circle at 12% -10%, rgba(146, 166, 112, 0.30) 0%, rgba(146, 166, 112, 0) 55%),
+    linear-gradient(168deg, #16210f 0%, #1d2a16 55%, #24301a 100%);
+}
+.an-header { display: flex; flex-direction: column; gap: 18px; max-width: 1180px; margin: 0 auto 22px; }
+.an-intro h1 {
+  margin: 0 0 6px; font-family: var(--font-display); font-weight: 600;
+  font-size: clamp(28px, 4vw, 42px); letter-spacing: -0.02em;
+}
+.an-intro p { margin: 0; max-width: 62ch; font-size: 15px; line-height: 1.55; color: var(--cream-72); }
+
+.an-controls {
+  max-width: 1180px; margin: 0 auto 14px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.an-hazards { display: flex; flex-wrap: wrap; gap: 8px; }
+.an-hazards .chip-btn { background: var(--glass); color: var(--cream-62); }
+.an-hazards .chip-btn[aria-selected="true"] {
+  background: var(--cta); color: var(--cta-text); border-color: transparent;
+}
+.an-filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; }
+.an-field { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: var(--cream-55); }
+.an-field select, .an-field input {
+  min-width: 190px; padding: 9px 11px; border-radius: 10px; font-size: 14px;
+  background: var(--glass); color: var(--cream);
+  border: 1px solid var(--glass-border);
+}
+.an-field select option { background: #1d2a16; color: var(--cream); }
+.an-check { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--cream-72); padding-bottom: 9px; }
+.an-check input { accent-color: var(--lime); width: 16px; height: 16px; }
+
+.an-meta { max-width: 1180px; margin: 0 auto 10px; font-size: 13px; color: var(--cream-55); }
+
+.an-table {
+  max-width: 1180px; margin: 0 auto;
+  border: 1px solid var(--card-border); border-radius: 16px; overflow: hidden;
+  background: var(--glass);
+}
+.an-row {
+  width: 100%; display: grid; gap: 14px; align-items: center; text-align: left;
+  grid-template-columns: 44px minmax(150px, 1.5fr) minmax(160px, 1.3fr) minmax(150px, 1.4fr);
+  padding: 12px 16px; background: transparent; border: 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--cream); font-family: var(--font-body); cursor: pointer;
+}
+.an-row:first-child { border-top: 0; }
+button.an-row:hover { background: rgba(255, 255, 255, 0.07); }
+.an-head {
+  cursor: default; font-size: 11.5px; letter-spacing: 0.06em; text-transform: uppercase;
+  color: var(--cream-45); background: rgba(0, 0, 0, 0.18);
+}
+.an-rank { font-variant-numeric: tabular-nums; color: var(--cream-50); font-size: 13px; }
+.an-name { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.an-name strong { font-size: 15px; font-weight: 600; }
+.an-name small, .an-fact small { font-size: 12px; color: var(--cream-50); }
+.an-score { position: relative; display: flex; align-items: center; gap: 10px; }
+.an-bar { height: 8px; border-radius: 6px; background: var(--cream-38); flex: 0 0 auto; max-width: 70%; }
+.an-num { font-variant-numeric: tabular-nums; font-size: 13px; color: var(--cream-72); }
+.an-fact { display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; color: var(--cream-78); }
+.an-fact strong { font-weight: 700; }
+
+/* The five bands of the scale, the same names the report uses. */
+.lvl-very-low { background: #7f9b6a; }
+.lvl-low { background: #a8c06a; }
+.lvl-moderate { background: var(--heat); }
+.lvl-high { background: var(--wildfire); }
+.lvl-very-high { background: #d9604a; }
+.lvl-no-data { background: var(--cream-38); }
+
+.an-more { max-width: 1180px; margin: 16px auto 0; display: flex; justify-content: center; }
+.an-note {
+  max-width: 1180px; margin: 22px auto 0; font-size: 12.5px; line-height: 1.6;
+  color: var(--cream-45);
+}
+.an-loading, .an-empty { margin: 0; padding: 22px 16px; font-size: 14px; color: var(--cream-55); }
+
+/* --- one municipality --- */
+.an-panel { width: min(820px, 100%); }
+.an-detail { display: flex; flex-direction: column; gap: 20px; min-height: 0; padding-right: 4px; }
+.an-scores { display: flex; flex-direction: column; gap: 8px; }
+.an-scorecell {
+  display: grid; grid-template-columns: minmax(130px, 1fr) minmax(0, 2fr) 42px;
+  gap: 12px; align-items: center;
+}
+.an-scorekey { font-size: 13px; color: var(--cream-72); }
+.an-sec { display: flex; flex-direction: column; gap: 10px; }
+.an-sec h3 {
+  margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 16px;
+}
+.an-secsub { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--cream-62); }
+.an-secsub code {
+  font-size: 12px; padding: 1px 5px; border-radius: 5px;
+  background: rgba(0, 0, 0, 0.30); color: var(--cream-78);
+}
+.an-zones { display: flex; flex-direction: column; gap: 6px; }
+.an-zone {
+  display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  padding: 9px 12px; border-radius: 10px; background: rgba(0, 0, 0, 0.20); font-size: 13px;
+}
+.an-zonename { color: var(--cream-85); }
+.an-zonecount { color: var(--cream-62); }
+.an-sources { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.an-sources li {
+  display: grid; grid-template-columns: 1fr auto; gap: 2px 12px;
+  padding: 10px 12px; border-radius: 10px; background: rgba(0, 0, 0, 0.18);
+}
+.an-indname { font-size: 13.5px; color: var(--cream-85); }
+.an-indval { font-size: 13.5px; font-variant-numeric: tabular-nums; color: var(--cream); font-weight: 700; }
+.an-sources small { grid-column: 1 / -1; font-size: 11.5px; line-height: 1.5; color: var(--cream-50); }
+.an-sources .an-method { color: var(--cream-45); }
+.an-sources .an-ctx { color: var(--lime); opacity: 0.75; }
+.an-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+.an-actions .chip-btn { text-decoration: none; display: inline-block; }
+
+.an-buildings { display: flex; flex-direction: column; gap: 8px; }
+.an-blist { display: flex; flex-direction: column; gap: 6px; max-height: 340px; overflow-y: auto; }
+.an-b {
+  display: grid; grid-template-columns: 150px 1fr 20px; gap: 12px; align-items: center;
+  padding: 9px 12px; border-radius: 10px; background: rgba(0, 0, 0, 0.20);
+  text-decoration: none; color: inherit;
+}
+.an-b:hover { background: rgba(255, 255, 255, 0.09); }
+.an-bzone {
+  font-size: 11px; font-weight: 700; padding: 3px 8px; border-radius: 6px;
+  color: #16210f; text-align: center;
+}
+.an-bmain { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.an-bmain strong { font-size: 13.5px; font-weight: 600; }
+.an-bmain small { font-size: 11.5px; color: var(--cream-50); }
+.an-bgo { color: var(--cream-45); }
+
+@media (max-width: 760px) {
+  .an-row { grid-template-columns: 30px 1fr; row-gap: 8px; }
+  .an-head { display: none; }
+  .an-score, .an-fact { grid-column: 2; }
+  .an-scorecell { grid-template-columns: 1fr; gap: 4px; }
+  .an-b { grid-template-columns: 1fr; }
+  .an-bzone { justify-self: start; }
+}
+
+/* The way into the analysis from the home page. Quiet: most people want one home. */
+.home-alt {
+  display: block; margin: 14px auto 0; max-width: 46ch; text-align: center;
+  font-size: 13px; line-height: 1.5; color: var(--cream-55); text-decoration: none;
+}
+.home-alt:hover { color: var(--cream-85); text-decoration: underline; }

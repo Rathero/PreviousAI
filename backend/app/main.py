@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import datetime as dt
+import logging
 
 from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -15,11 +16,23 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import (autonomy_store, briefing, cache, claims, config, demo, dwelling as DW, interpret,
-               mapping, media, pdf_report, protection, report as R, scoring, video, view)
+from . import (analysis, autonomy_store, briefing, cache, claims, config, demo, dwelling as DW,
+               interpret, mapping, media, pdf_report, protection, report as R, scoring, video,
+               view)
 from .providers import ai, cds, cds_baseline, fal, geocoding, miteco, open_meteo, streetview
 
+# Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+# Why there is no database behind this service, deliberately: one process, one disk.
+# Autonomy runs, demo records and CDS jobs are already written to disk as JSON, so they
+# survive a restart. The one piece held only in memory is briefing.JOBS, and a finished
+# briefing is read back from its .json and .mp4, so a restart costs a re-render at
+# worst. What a database would buy is a second replica, and the day that is wanted it
+# is not enough on its own: the generated media (mp4, audio, PDF) would need object
+# storage too. Until then, do not run more than one replica against the same data dir.
+
 FRONTEND_DIR = config.ROOT / "frontend"
+
+log = logging.getLogger(__name__)
 
 app = FastAPI(
     title="Previous AI",
@@ -467,6 +480,58 @@ async def protection_catalogue(family: str | None = None):
 
 
 # --------------------------------------------------------------------------- #
+# The national analysis: the report read backwards
+# --------------------------------------------------------------------------- #
+
+@app.get("/api/analysis/ranking")
+async def analysis_ranking(
+    hazard: str = Query("overall", description="which column to sort by"),
+    province: str | None = None,
+    q: str | None = Query(None, description="match the name of the town"),
+    exposed: bool = Query(False, description="only towns whose buildings have been crossed "
+                                             "with the official flood zones"),
+    min_score: float | None = Query(None, ge=0, le=100),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0),
+):
+    """Every municipality, ranked. Built in batch; this only reads it from disk."""
+    out = analysis.ranking(hazard=hazard, province=province, query=q, only_exposed=exposed,
+                           min_score=min_score, limit=limit, offset=offset)
+    if not out["available"]:
+        raise HTTPException(status_code=503,
+                            detail="the national analysis has not been built yet: run "
+                                   "backend/scripts/analysis_build.py")
+    return out
+
+
+@app.get("/api/analysis/municipality/{code}")
+async def analysis_municipality(code: str):
+    """One municipality: its scores, every number's source, and its exposure if built."""
+    out = analysis.municipality(code)
+    if not out:
+        raise HTTPException(status_code=404, detail=f"no municipality {code} in the analysis")
+    return out
+
+
+@app.get("/api/analysis/buildings/{code}")
+async def analysis_buildings(code: str, zone: str | None = None,
+                             limit: int = Query(200, ge=1, le=1000),
+                             offset: int = Query(0, ge=0)):
+    """The buildings of a municipality that stand in an official flood zone.
+
+    Each row carries the coordinates `/api/report` takes as a query, which is the whole
+    point: from a ranked town to a building to that building's own report.
+    """
+    out = analysis.buildings(code, zone=zone, limit=limit, offset=offset)
+    if not out["available"]:
+        raise HTTPException(
+            status_code=404,
+            detail=f"the buildings of {code} have not been crossed with the flood zones yet: "
+                   f"run analysis_build.py --only exposure --municipality {code}")
+    return out
+
+
+# --------------------------------------------------------------------------- #
 # Autonomous engineering layer (Devin + the gate)
 # --------------------------------------------------------------------------- #
 @app.get("/api/autonomy/runs")
@@ -575,6 +640,13 @@ class SpreadRequest(BaseModel):
     lon: float = Field(ge=-180, le=180)
 
 
+# Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+# One fixed line for the caller. What the provider actually said (the exception class,
+# its message, upstream urls and ids) stays in the server log: it is ours to debug
+# with, not something a public endpoint should hand out.
+SPREAD_UNAVAILABLE = "The fire-spread simulation is unavailable right now."
+
+
 @app.post("/api/fire-spread")
 async def fire_spread_start(body: SpreadRequest):
     """Starts (or returns) today's simulation from the nearest risky land. Poll the
@@ -588,7 +660,9 @@ async def fire_spread_start(body: SpreadRequest):
     try:
         return await fire_spread.start(body.lat, body.lon)
     except Exception as exc:  # noqa: BLE001 - the report is fine without the what-if
-        raise HTTPException(status_code=502, detail=f"Deepfire: {type(exc).__name__}: {exc}") from exc
+        # Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+        log.exception("Deepfire fire-spread start failed")
+        raise HTTPException(status_code=502, detail=SPREAD_UNAVAILABLE) from exc
 
 
 @app.get("/api/fire-spread/{sim_id}")
@@ -601,7 +675,9 @@ async def fire_spread_status(sim_id: str, lat: float, lon: float):
     try:
         return await fire_spread.status(sim_id, lat, lon)
     except Exception as exc:  # noqa: BLE001
-        raise HTTPException(status_code=502, detail=f"Deepfire: {type(exc).__name__}: {exc}") from exc
+        # Recommended by Norma — fixed with Claude Opus 5 via Claude Code
+        log.exception("Deepfire fire-spread status failed for %s", sim_id)
+        raise HTTPException(status_code=502, detail=SPREAD_UNAVAILABLE) from exc
 
 
 # --------------------------------------------------------------------------- #
@@ -644,6 +720,10 @@ if FRONTEND_DIR.exists():
 
     @app.get("/kit", include_in_schema=False)
     async def kit_page():
+        return _page()
+
+    @app.get("/analisis", include_in_schema=False)
+    async def analysis_page():
         return _page()
 
     @app.get("/favicon.ico", include_in_schema=False)

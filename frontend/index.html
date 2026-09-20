@@ -87,6 +87,70 @@
 
       <button type="submit" class="cta" id="seeRisks">See risks →</button>
     </form>
+
+    <!-- The other way round, for whoever has to reach the homes rather than live in
+         one: a town hall, a comarca, an emergency service. -->
+    <a class="home-alt" href="/analisis" data-nav>Not one home? See which municipalities
+      and buildings are most exposed →</a>
+  </div>
+</main>
+
+<!-- =================================================== The analysis, backwards -->
+<!-- The report asks one home what threatens it. This asks the country which homes are
+     threatened: every municipality ranked, then the buildings inside the official flood
+     zones, each one a link to its own report. -->
+<main id="analysis" class="view view-analysis" hidden>
+  <header class="an-header">
+    <a href="/" class="logo logo-sm" data-nav aria-label="Previous AI, home">Previous<span>AI</span></a>
+    <div class="an-intro">
+      <h1>Which homes this threatens</h1>
+      <p id="anIntro">Every municipality of Spain against the same data a report uses,
+        and inside the ones already crossed with the official flood maps, the buildings
+        that stand in them.</p>
+    </div>
+  </header>
+
+  <div class="an-controls">
+    <div class="chips an-hazards" id="anHazards" role="tablist" aria-label="Rank by"></div>
+    <div class="an-filters">
+      <label class="an-field">
+        <span>Province</span>
+        <select id="anProvince"><option value="">All</option></select>
+      </label>
+      <label class="an-field">
+        <span>Town</span>
+        <input type="search" id="anQuery" placeholder="Name of the town" autocomplete="off">
+      </label>
+      <label class="an-check">
+        <input type="checkbox" id="anExposed">
+        <span>Only with buildings counted</span>
+      </label>
+    </div>
+  </div>
+
+  <p class="an-meta" id="anMeta" aria-live="polite"></p>
+
+  <div class="an-table" id="anTable"></div>
+  <div class="an-more">
+    <button type="button" class="chip-btn ghost" id="anMore" hidden>Show more</button>
+  </div>
+
+  <p class="an-note" id="anNote"></p>
+
+  <!-- One municipality: its numbers with their sources, and its exposed buildings -->
+  <div class="overlay" id="anDialog" hidden>
+    <div class="overlay-backdrop" data-close></div>
+    <div class="overlay-panel an-panel glass-solid" role="dialog" aria-modal="true"
+         aria-labelledby="anTitle">
+      <div class="panel-head">
+        <div class="panel-title">
+          <h2 id="anTitle"></h2>
+          <p class="panel-sub" id="anSub"></p>
+        </div>
+        <button type="button" class="icon-btn" id="anClose" data-close aria-label="Close">&times;</button>
+      </div>
+      <div class="an-detail scroll" id="anDetail"></div>
+    </div>
   </div>
 </main>
 

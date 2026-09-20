@@ -16,6 +16,7 @@ called. Two rules apply to all of them:
 | [Copernicus CDS / EWDS](#copernicus-climate-data-store-and-early-warning-data-store) | ERA5 daily statistics (cross-check), fire-danger projection to 2060 | Batch jobs | `CDS_API_KEY`, `EWDS_API_KEY` | Wildfire card, ERA5 verification, `/api/cds/*` |
 | [MITECO · SNCZI](#miteco--snczi-flood-zones) | Official flood zones of Spain (T10–T500, preferential flow) | Live WFS | No | Floods |
 | [IGN](#ign-instituto-geográfico-nacional) | Flood water depths, CartoCiudad geocoder, PNOA aerial imagery | Live WMS / API / WMTS | No | Floods, address search, aerial view |
+| [Catastro · INSPIRE](#catastro--inspire-download-service) | Every municipality of Spain and every building footprint, with year, use and dwellings | Batch ATOM + GML | No | The national analysis (`/analisis`) |
 | [ICGC](#icgc-institut-cartogràfic-i-geològic-de-catalunya) | Sea-level rise, avalanche map and avalanche database | Live WMS + batch WFS | No | Floods, avalanches, history |
 | [AGORA · University of Barcelona](#agora--university-of-barcelona) | Flood episodes per Catalan municipality, 1902–2020 | Batch | No | Floods, history |
 | [Government of Catalonia](#government-of-catalonia) | Wildfire perimeters, fires by municipality, INFOCAT class, Pla Alfa level | Batch + live | No | Wildfires, history |
@@ -83,6 +84,36 @@ on its web page.
 
 ## Official maps and records
 
+### Catastro · INSPIRE download service
+
+The Directorate General for Cadastre's INSPIRE ATOM feeds, downloaded in batch by
+`backend/scripts/analysis_build.py`. Nothing here is on the path of a request.
+
+| Feed | Data | How it is used |
+|---|---|---|
+| `CadastralParcels/{PP}/ES.SDGC.CP.atom_{PP}.xml` | One entry per municipality with its name and bounding box | The universe of the ranking: **7,597** municipalities, and the centre each climate cell is read at |
+| `buildings/{PP}/ES.SDGC.bu.atom_{PP}.xml` | The download link for each municipality's buildings | Finding the right zip |
+| `Buildings/{PP}/{code}-{NAME}/A.ES.SDGC.BU.{code}.zip` | Every building footprint of one town (about 1.5 MB), with its cadastral reference, year of construction, use, number of dwellings, number of units, floor area and condition | The exposure: each footprint's centre tested against the SNCZI flood zones |
+
+Two things to know about its codes and its coverage:
+
+- **It is not the INE code.** The cadastre agrees with INE for most towns but gives the
+  provincial capitals a 900: Barcelona is `08900`, not `08019`. Joining the Catalan
+  layers on the code alone silently loses 120 municipalities, the four capitals among
+  them, so they are matched on the ground instead - the pair of bounding boxes that
+  overlap best is the pair - and both codes are kept on the row.
+- **It is the cadastre of common regime.** Alava, Gipuzkoa, Bizkaia and Navarre keep
+  their own and publish nothing here, so their municipalities are absent from the
+  ranking, which says so rather than showing an empty province.
+
+The feeds declare ISO-8859-1 and mean it; read as UTF-8 they turn "Almeria" into a
+replacement character and every match made on a name fails.
+
+Licence: free reuse of the cadastral cartography, with attribution. It publishes
+buildings, not the people in them: no owner or occupant data is downloaded or stored.
+
+---
+
 ### MITECO · SNCZI flood zones
 
 Spain's National Flood Zone Mapping System, WFS at `gis.miteco.gob.es/geoserver/agua`
@@ -91,6 +122,14 @@ preferential flow zone and the 10, 50, 100 and 500-year flood zones. The worst z
 containing the point scores (92, 88, 78, 66, 42) on the **Floods** risk; the river and
 study name go into the headline. Only complete answers are cached. Free use with
 attribution to MITECO.
+
+The national analysis calls the same WFS differently: one `BBOX` query per municipality
+per layer, which returns each feature's **whole** geometry (a river that crosses half a
+province is several megabytes). Those polygons are indexed once per municipality by
+`app/spatial.py` and every cadastral footprint is tested against that index, so an answer
+for thousands of buildings costs five requests instead of thousands. The result was
+checked against this per-point endpoint on a sample of Paiporta buildings and agreed on
+all of them.
 
 ### IGN (Instituto Geográfico Nacional)
 

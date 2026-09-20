@@ -92,6 +92,14 @@ FIRE_INSIDE_FLOOR = 60
 BREAKPOINTS["fire_weather_fwi"] = [(0, 0), (5, 15), (15, 30), (35, 50), (60, 65),
                                    (90, 78), (120, 88), (170, 96), (250, 100)]
 
+# Hectares burnt inside the municipality. The `fire_history` scale above counts FIRES
+# near a house, and counting fires per town instead ranks dense cities first: Sabadell
+# records 82 of them and 12 burnt hectares, which is a summer of roadside grass, not a
+# wildfire history. Area is what distinguishes them, so area is what scores. Set
+# against the Catalan record 2011-2026: a median town burns 1.5 ha, the worst 8,738.
+BREAKPOINTS["burnt_area_municipal"] = [(0, 0), (5, 12), (25, 25), (100, 40), (400, 58),
+                                       (1200, 72), (3000, 85), (8000, 95), (20000, 100)]
+
 # How much of a municipality has to stand in a flood zone for the zone's severity to
 # describe the town rather than a handful of buildings. A town where a quarter of the
 # buildings sit in the preferential flow zone IS a 92; three houses in it are not.
@@ -135,25 +143,33 @@ def score_flood_zones(inside: list[str]) -> float:
 def score_flood_exposure(counts: dict[str, int], total: int) -> dict | None:
     """Municipal flood score from the buildings standing in each official zone.
 
-    `counts` is {zone key: buildings whose footprint centre falls inside it} and
-    `total` every building the cadastre has for the town. The worst zone with enough
-    buildings sets the ceiling and the share of the town inside it decides how much of
-    that ceiling the municipality gets. Returns the score, the zone that set it and
-    the share, so the API can say all three instead of just a number.
+    `counts` is {zone key: buildings whose footprint centre falls inside it, and inside
+    no worse one} and `total` every building the cadastre has for the town.
+
+    Each zone is weighed on its own and the worst reading wins. Stopping at the most
+    severe zone present would be a mistake: Orihuela has five buildings in the
+    preferential flow zone and two thousand in T500, and reading only the first turns a
+    town with nine per cent of its buildings on a flood plain into a 2. A zone's share
+    is cumulative - a building in T10 is on ground that T500 also covers - so "T500"
+    means "in T500 or worse".
     """
     if not total:
         return None
     ranked = sorted(((FLOOD_ZONE_SCORES[k], k) for k in counts if k in FLOOD_ZONE_SCORES),
                     reverse=True)
+    best = {"score": 0.0, "zone": None, "ceiling": None, "share": 0.0, "buildings": 0}
+    cumulative = 0
     for ceiling, zone in ranked:
-        n = counts.get(zone, 0)
-        if n < FLOOD_MIN_BUILDINGS:
+        cumulative += counts.get(zone, 0)
+        if cumulative < FLOOD_MIN_BUILDINGS:
             continue
-        share = n / total
+        share = cumulative / total
         factor = (interpolate(share, FLOOD_SHARE_FACTOR) or 0.0) / 100.0
-        return {"score": round(ceiling * factor, 1), "zone": zone, "ceiling": ceiling,
-                "share": round(share, 4), "buildings": n}
-    return {"score": 0.0, "zone": None, "ceiling": None, "share": 0.0, "buildings": 0}
+        score = round(ceiling * factor, 1)
+        if score > best["score"]:
+            best = {"score": score, "zone": zone, "ceiling": ceiling,
+                    "share": round(share, 4), "buildings": cumulative}
+    return best
 
 
 def interpolate(value: float | None, breakpoints: list[tuple[float, float]]) -> float | None:

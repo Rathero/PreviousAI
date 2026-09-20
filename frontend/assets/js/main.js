@@ -1,8 +1,10 @@
-// Entry point: two views, one page. "/" asks for the home; "/report?address=..." shows its
-// risks, "/shop?address=..." what it needs and "/kit?address=..." the basic emergency kit,
-// all from the same report.
+// Entry point: three views, one page. "/" asks for the home; "/report?address=..." shows
+// its risks, "/shop?address=..." what it needs and "/kit?address=..." the basic emergency
+// kit, all from the same report. "/analisis" is that report read backwards: the country
+// ranked, down to the buildings inside the official flood zones.
 
 import { api } from "./api.js";
+import { initAnalysis, showAnalysis } from "./analysis.js";
 import { initHome, showHome } from "./home.js";
 import { initReport, showReport } from "./report.js";
 
@@ -19,15 +21,24 @@ function route() {
   const url = new URL(window.location.href);
   const home = document.getElementById("home");
   const report = document.getElementById("report");
+  const analysis = document.getElementById("analysis");
   const page = { "/report": "risks", "/shop": "shop", "/kit": "kit" }[url.pathname];
-  if (page && url.searchParams.get("address")) {
+  if (url.pathname === "/analisis") {
     home.hidden = true;
+    report.hidden = true;
+    analysis.hidden = false;
+    document.title = "Which homes this threatens · Previous AI";
+    showAnalysis(url.searchParams);
+  } else if (page && url.searchParams.get("address")) {
+    home.hidden = true;
+    analysis.hidden = true;
     report.hidden = false;
     const prefix = { shop: "What this home needs · ", kit: "Basic emergency kit · " }[page] || "";
     document.title = `${prefix}${url.searchParams.get("address")} · Previous AI`;
     showReport(url.searchParams, page);
   } else {
     report.hidden = true;
+    analysis.hidden = true;
     home.hidden = false;
     document.title = "Previous AI · Natural risks at your home";
     showHome(url.searchParams);
@@ -46,6 +57,7 @@ window.addEventListener("popstate", route);
 async function boot() {
   initHome(app);
   initReport(app);
+  initAnalysis(app);
   route();
   try {
     app.health = await api.health();
