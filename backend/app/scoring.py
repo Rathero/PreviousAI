@@ -76,6 +76,34 @@ FLOOD_ZONE_SCORES = {
 FIRE_INSIDE_FLOOR = 60
 
 
+# --- The national analysis ---------------------------------------------------------
+# These two describe a MUNICIPALITY, not a point, and they exist because the national
+# ranking cannot ask the sources a report asks: ERA5 is not available for eight
+# thousand towns, and the official flood polygons only mean something once they are
+# crossed with the buildings that stand in them.
+
+# Days a year with a Fire Weather Index above 30 (EURO-CORDEX, 1981-2005). This is NOT
+# the `wildfire` metric above: FWI > 30 is a laxer threshold than the 30-30-30 rule and
+# counts roughly twice as many days, so it needs its own scale or the ranking would
+# call a quarter of Spain "very high". The breakpoints are set against the Spanish
+# distribution of the layer itself: its median (35 days) lands at the top of
+# "moderate", its 90th percentile (92 days) inside "high", and only the driest 1 %
+# (over 130 days: Almeria, the middle Ebro, inland Murcia) reaches "very high".
+BREAKPOINTS["fire_weather_fwi"] = [(0, 0), (5, 15), (15, 30), (35, 50), (60, 65),
+                                   (90, 78), (120, 88), (170, 96), (250, 100)]
+
+# How much of a municipality has to stand in a flood zone for the zone's severity to
+# describe the town rather than a handful of buildings. A town where a quarter of the
+# buildings sit in the preferential flow zone IS a 92; three houses in it are not.
+# As a percentage of the zone's own score, so that `interpolate` (which rounds to one
+# decimal) keeps its precision.
+FLOOD_SHARE_FACTOR = [(0.0, 0.0), (0.005, 50.0), (0.02, 70.0), (0.05, 85.0),
+                      (0.12, 95.0), (0.25, 100.0)]
+# Below this many exposed buildings a zone is treated as noise: cadastral footprints
+# and flood polygons are drawn by different services and their edges disagree.
+FLOOD_MIN_BUILDINGS = 3
+
+
 # --- Avalanches --------------------------------------------------------------------
 # ICGC's avalanche zone map (Catalan Pyrenees, 1:25,000). Being inside a mapped path is
 # the strongest statement available; distance to the nearest path and avalanches
@@ -102,6 +130,30 @@ def score_avalanche_distance(distance_m: float | None) -> float | None:
 
 def score_flood_zones(inside: list[str]) -> float:
     return float(max((FLOOD_ZONE_SCORES[k] for k in inside if k in FLOOD_ZONE_SCORES), default=0))
+
+
+def score_flood_exposure(counts: dict[str, int], total: int) -> dict | None:
+    """Municipal flood score from the buildings standing in each official zone.
+
+    `counts` is {zone key: buildings whose footprint centre falls inside it} and
+    `total` every building the cadastre has for the town. The worst zone with enough
+    buildings sets the ceiling and the share of the town inside it decides how much of
+    that ceiling the municipality gets. Returns the score, the zone that set it and
+    the share, so the API can say all three instead of just a number.
+    """
+    if not total:
+        return None
+    ranked = sorted(((FLOOD_ZONE_SCORES[k], k) for k in counts if k in FLOOD_ZONE_SCORES),
+                    reverse=True)
+    for ceiling, zone in ranked:
+        n = counts.get(zone, 0)
+        if n < FLOOD_MIN_BUILDINGS:
+            continue
+        share = n / total
+        factor = (interpolate(share, FLOOD_SHARE_FACTOR) or 0.0) / 100.0
+        return {"score": round(ceiling * factor, 1), "zone": zone, "ceiling": ceiling,
+                "share": round(share, 4), "buildings": n}
+    return {"score": 0.0, "zone": None, "ceiling": None, "share": 0.0, "buildings": 0}
 
 
 def interpolate(value: float | None, breakpoints: list[tuple[float, float]]) -> float | None:

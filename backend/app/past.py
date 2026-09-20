@@ -11,7 +11,9 @@ sentence under it and its record, newest first, all from the report's own histor
   - the hottest days of the ERA5 record.
 
 A record that covers the place and holds nothing says so, and a place no record covers
-says that instead: an empty tile never reads as a safe one.
+says that instead: an empty tile never reads as a safe one. And where the record is
+empty but the hazard card beside it is not, the tile says what the card says rather
+than "nothing" (`_agrees_with_its_card`).
 """
 
 from __future__ import annotations
@@ -191,6 +193,21 @@ def _avalanche(report: dict, items: list[dict], tile: dict | None) -> dict:
     return _none("No avalanche record covers this address.")
 
 
+def _agrees_with_its_card(entry: dict, tile: dict | None) -> dict:
+    """A tile never reads "nothing" while the card beside it lists something.
+
+    Each risk above counts one record: mapped fires, flood episodes, observed
+    avalanches, the hottest days. The story column beside the tile reads the whole
+    hazard card, which knows more — fire weather, the heat climatology, the official
+    flood zone. Where the record is empty but the card is not, the tile drops "no
+    record" and says what the card says; the number stays blank, because nothing was
+    counted.
+    """
+    if entry["available"] or not (tile or {}).get("story") or not tile.get("fact"):
+        return entry
+    return {**entry, "fact": tile["fact"]}
+
+
 # --------------------------------------------------------------------------- #
 # The view
 # --------------------------------------------------------------------------- #
@@ -204,6 +221,7 @@ def build(report: dict, tiles: list[dict]) -> dict:
         "avalanche": _avalanche(report, items, by_key.get("avalanche")),
         "heat": _heat(report),
     }
+    risks = {k: _agrees_with_its_card(v, by_key.get(k)) for k, v in risks.items()}
     # At most three, so the title takes no more lines than today's and the page keeps its
     # height; the heat, the last one, is the first to go.
     seen = [r["phrase"] for r in risks.values() if r.get("phrase")][:3]

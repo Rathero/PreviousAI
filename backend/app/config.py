@@ -33,12 +33,15 @@ CDS_DIR = DATA_DIR / "cds"
 BASELINE_DIR = DATA_DIR / "baseline"
 # Official Catalan layers, downloaded in batch by backend/scripts/catalonia_build.py.
 CATALONIA_DIR = DATA_DIR / "catalonia"
+# The national analysis: every municipality ranked, and the buildings exposed in the
+# ones that matter. Built in batch by backend/scripts/analysis_build.py.
+ANALYSIS_DIR = DATA_DIR / "analysis"
 # Generated media: the illustration library (backend/scripts/fal_media.py) and the
 # narrated briefings, rendered on demand.
 MEDIA_DIR = DATA_DIR / "media"
 AUTONOMY_DIR = DATA_DIR / "autonomy"
 
-for _d in (CACHE_DIR, CDS_DIR, BASELINE_DIR, CATALONIA_DIR, MEDIA_DIR, AUTONOMY_DIR):
+for _d in (CACHE_DIR, CDS_DIR, BASELINE_DIR, CATALONIA_DIR, ANALYSIS_DIR, MEDIA_DIR, AUTONOMY_DIR):
     _d.mkdir(parents=True, exist_ok=True)
 
 # --- Time windows ---------------------------------------------------------------
