@@ -630,10 +630,46 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .story li { display: flex; gap: 14px; }
 .story .when { font-size: 14px; line-height: 1.85; color: var(--cream-55); min-width: 92px; flex-shrink: 0; }
 .story .what { font-size: 17px; line-height: 1.5; color: var(--cream-88); }
+/* A step to tick, here and in the full plan. The box is drawn rather than left to the
+   browser: round, glass while it waits, lime with a dark tick once it is done — the
+   same surface as the pills and the cards. A native checkbox takes an accent colour
+   but never a shape. */
+.step input, .check input {
+  appearance: none; -webkit-appearance: none;
+  flex-shrink: 0; margin: 0; cursor: pointer;
+  border-radius: 999px;
+  border: 1.5px solid rgba(255, 255, 255, 0.30);
+  background: rgba(255, 255, 255, 0.07) center / 58% no-repeat;
+  transition: background-color .15s, border-color .15s, box-shadow .15s;
+}
+.step input:hover, .check input:hover {
+  background-color: rgba(255, 255, 255, 0.16); border-color: rgba(255, 255, 255, 0.58);
+}
+/* Done: the tick is a shape as well as a colour, so it reads without the green. */
+.step input:checked, .check input:checked {
+  background-color: var(--link); border-color: var(--link);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2316210e' stroke-width='3.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6 9 17l-5-5'/%3E%3C/svg%3E");
+  box-shadow: 0 0 0 3px rgba(166, 226, 46, 0.15);
+}
+.step input:checked:hover, .check input:checked:hover {
+  background-color: var(--lime); border-color: var(--lime);
+}
+
 .step { display: flex; align-items: flex-start; gap: 12px; }
-.step input { width: 20px; height: 20px; margin: 1px 0 0; accent-color: var(--link); flex-shrink: 0; cursor: pointer; }
+.step input { width: 21px; height: 21px; margin-top: 2px; }
 .step label { font-size: 17px; line-height: 1.45; color: var(--cream-88); cursor: pointer; }
 .step input:checked + label { color: var(--cream-50); text-decoration: line-through; text-decoration-color: rgba(247, 245, 239, 0.35); }
+/* Who the plan was ranked for, under its heading: the visible half of "Who lives here?". */
+.plan-who {
+  display: flex; align-items: center; gap: 8px; margin: -4px 0 0;
+  font-size: 14px; line-height: 1.4; color: var(--cream-72);
+}
+.plan-who .who-icon { flex-shrink: 0; }
+.plan-who button {
+  padding: 0 0 0 6px; background: none; border: none; cursor: pointer;
+  font: inherit; font-weight: 600; color: var(--link);
+}
+.plan-who button:hover { text-decoration: underline; }
 .more {
   align-self: flex-start;
   padding: 0; background: none; border: none; cursor: pointer; text-decoration: none;
@@ -671,22 +707,61 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   display: flex; align-items: center; justify-content: center;
   padding: 32px;
 }
-.overlay-backdrop { position: absolute; inset: 0; background: rgba(6, 9, 5, 0.66); }
+.overlay-backdrop { position: absolute; inset: 0; background: rgba(6, 9, 5, 0.70); backdrop-filter: blur(3px); }
+/* A dialog is the report's own surface lifted off the page, not a grey box on top of it:
+   the same warm green gradient, the same dotted texture and the same glass edge. */
 .overlay-panel {
   position: relative;
+  overflow: hidden;
   width: min(1100px, 100%);
   max-height: calc(100vh - 64px);
   max-height: calc(100dvh - 64px);
   border-radius: 24px;
-  padding: 22px 24px 24px;
+  padding: 24px 26px 26px;
   display: flex; flex-direction: column; gap: 16px;
+  background:
+    radial-gradient(circle at 8% -8%, rgba(146, 166, 112, 0.42) 0%, rgba(146, 166, 112, 0) 58%),
+    linear-gradient(158deg, rgba(26, 35, 22, 0.97) 0%, rgba(40, 51, 32, 0.97) 48%, rgba(62, 70, 45, 0.97) 100%);
+  border-color: rgba(255, 255, 255, 0.22);
+  box-shadow: 0 34px 90px rgba(6, 10, 4, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.10);
 }
-.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 0; }
+.overlay-panel::before {
+  content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: 0.4;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 3px 3px;
+}
+.overlay-panel > * { position: relative; z-index: 1; }
+
+.panel-head {
+  display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; min-width: 0;
+  padding-bottom: 14px; border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+}
+.panel-title { display: flex; flex-direction: column; gap: 3px; min-width: 0; }
 .panel-head h2 {
   margin: 0; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-  font-family: var(--font-display); font-weight: 600; font-size: 19px;
+  font-family: var(--font-display); font-weight: 600; font-size: 22px; letter-spacing: -0.012em;
 }
+.panel-sub { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--cream-60); }
+.panel-sub:empty { display: none; }
 .panel-head-right { display: flex; align-items: center; gap: 12px; flex-shrink: 0; }
+/* How much of the plan is done, across every tab. */
+.panel-bar {
+  flex-shrink: 0;
+  height: 4px; border-radius: 999px; overflow: hidden; margin-top: -6px;
+  background: rgba(255, 255, 255, 0.10);
+}
+.panel-bar span {
+  display: block; height: 100%; width: var(--done, 0%); border-radius: 999px;
+  background: linear-gradient(90deg, var(--link), var(--lime));
+  transition: width .3s ease;
+}
+/* The line that closes a dialog: the total and the small print. */
+.panel-foot {
+  flex-shrink: 0; display: flex; align-items: center; justify-content: space-between; gap: 20px;
+  padding-top: 16px; border-top: 1px solid rgba(255, 255, 255, 0.12);
+}
+.panel-foot .adv-cta { width: auto; padding: 12px 30px; }
+.panel-foot:empty { display: none; }
 .source { font-size: 13px; color: var(--cream-50); white-space: nowrap; }
 .icon-btn {
   width: 34px; height: 34px; border-radius: 999px; padding: 0;
@@ -803,16 +878,39 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .col { scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.25) transparent; }
 .plan-note { margin: 0; font-size: 14px; line-height: 1.5; color: var(--cream-85); }
 .household h3, .phase h3 {
-  margin: 0 0 8px; font-size: 11.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  margin: 0; font-size: 11.5px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
   color: var(--cream-55);
 }
-.household ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 4px; }
-.household li { position: relative; padding-left: 16px; font-size: 14.5px; line-height: 1.5; color: var(--cream); }
-.household li::before { content: "★"; position: absolute; left: 0; top: 2px; font-size: 10px; color: var(--lime); }
-/* Before, during and after on the left; what to buy, with its products, on the right */
+.phase h3 { margin-bottom: 8px; }
+/* What the household changes in the plan: its own card, so "Update plan" lands somewhere
+   the eye finds. */
+.household {
+  padding: 14px 16px; border-radius: 16px;
+  background: linear-gradient(140deg, rgba(166, 226, 46, 0.14) 0%, rgba(166, 226, 46, 0.04) 70%);
+  border: 1px solid rgba(166, 226, 46, 0.30);
+}
+.household-head { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.household-head .who-icon { flex-shrink: 0; }
+.household-who {
+  padding: 3px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 700;
+  background: rgba(166, 226, 46, 0.16); border: 1px solid rgba(166, 226, 46, 0.42); color: var(--link);
+}
+.household ul { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.household li {
+  position: relative; padding-left: 18px; font-size: 14.5px; line-height: 1.5; color: var(--cream-85);
+}
+.household li::before {
+  content: ""; position: absolute; left: 2px; top: 8px; width: 5px; height: 5px; border-radius: 999px;
+  background: var(--cream-45);
+}
+.household li.for-them { color: var(--cream); }
+.household li.for-them::before { content: "★"; top: 1px; left: 0; width: auto; height: auto; background: none; font-size: 10px; color: var(--lime); }
+.household li small { display: block; margin-top: 2px; font-size: 12px; color: var(--cream-50); }
+/* Before, during and after on the left; what to buy or arrange on the right. The steps
+   are all this dialog holds — the products they point at are sold outside it. */
 .phases {
-  display: grid; gap: 20px 36px;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
+  display: grid; gap: 20px 40px;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   grid-template-rows: auto auto 1fr;
   grid-template-areas: "before buy" "during buy" "after buy";
 }
@@ -828,41 +926,12 @@ button:focus-visible, a:focus-visible, input:focus-visible {
 .phase li, .emergency li { font-size: 14.5px; line-height: 1.5; color: var(--cream-85); padding: 4px 0; }
 .emergency { columns: 2; column-gap: 32px; }
 .emergency li { break-inside: avoid; }
-.check { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 10px; align-items: start; cursor: pointer; }
-.check input { width: 17px; height: 17px; margin: 2px 0 0; accent-color: var(--link); cursor: pointer; }
+.check { display: grid; grid-template-columns: 19px minmax(0, 1fr); gap: 11px; align-items: start; cursor: pointer; }
+.check input { width: 19px; height: 19px; margin-top: 1px; }
 .check input:checked + span { color: var(--cream-50); text-decoration: line-through; text-decoration-color: rgba(247, 245, 239, 0.35); }
 .bullet { display: grid; grid-template-columns: 10px minmax(0, 1fr); gap: 8px; }
 .bullet::before { content: ""; width: 4px; height: 4px; border-radius: 999px; margin-top: 9px; background: var(--cream-45); }
 
-/* Products under a step: the store's photo, what it is, the price and the store */
-.products {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px;
-  margin: 8px 0 6px 28px;
-}
-.product {
-  display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 11px; align-items: center;
-  padding: 8px 10px 8px 8px; border-radius: 14px;
-  background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.14);
-  color: var(--cream); text-decoration: none;
-  transition: background .15s, border-color .15s;
-}
-.product:hover { background: rgba(255, 255, 255, 0.11); border-color: rgba(186, 242, 74, 0.55); }
-.product-img {
-  width: 64px; height: 64px; border-radius: 10px; overflow: hidden;
-  display: grid; place-items: center; background: #fff;
-}
-.product-img img { width: 100%; height: 100%; padding: 4px; object-fit: contain; display: block; }
-.product-img.broken { background: rgba(255, 255, 255, 0.10); }
-.product-img.broken img { display: none; }
-.product-body { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
-.product-name { font-size: 13.5px; font-weight: 700; line-height: 1.3; }
-.product-what {
-  font-size: 12.5px; line-height: 1.4; color: var(--cream-62);
-  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
-}
-.product-buy { font-size: 12.5px; line-height: 1.4; color: var(--cream-75); }
-.product-buy b { color: var(--link); font-weight: 700; }
-.product:hover .product-buy { color: var(--cream); }
 .plan-fine { margin: 0; font-size: 12.5px; line-height: 1.5; color: var(--cream-50); }
 
 /* ================================================================ What this home needs */
@@ -1029,19 +1098,20 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   transition: background .15s;
 }
 .adv-cta:hover { background: var(--lime); }
-/* Buying the kit: its items store by store. */
-.adv-panel { width: min(640px, 100%); }
-.adv-stores { min-height: 0; display: flex; flex-direction: column; gap: 16px; padding-right: 4px; }
-.adv-store { display: flex; flex-direction: column; gap: 8px; }
-.adv-store-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-.adv-store-head h3 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 17px; color: var(--cream); }
-.adv-store-head span { font-size: 13.5px; color: var(--cream-60); }
-.adv-store ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
-.adv-store li {
-  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: baseline; gap: 14px;
-  padding: 9px 0; border-top: 1px solid rgba(255, 255, 255, 0.10); font-size: 14.5px; color: var(--cream-85);
+/* Buying the kit: its items store by store, each row the same as the kit's rows on the
+   page — the store's photo, what it is, the price and the link to its own page. */
+.adv-panel { width: min(760px, 100%); }
+.adv-stores { min-height: 0; display: flex; flex-direction: column; gap: 18px; padding-right: 10px; }
+.adv-store { display: flex; flex-direction: column; gap: 10px; }
+.adv-store-head {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 12px;
+  padding-bottom: 8px; border-bottom: 1px solid rgba(255, 255, 255, 0.10);
 }
-.adv-store li b { font-variant-numeric: tabular-nums; color: var(--cream); }
+.adv-store-head h3 { margin: 0; font-family: var(--font-display); font-weight: 600; font-size: 17px; color: var(--cream); }
+.adv-store-head span { font-size: 13.5px; color: var(--cream-60); font-variant-numeric: tabular-nums; }
+.adv-store .kit-price small { color: var(--link); font-weight: 700; }
+.panel-foot .adv-total { flex-shrink: 0; }
+.panel-foot .adv-total b { font-size: 28px; }
 
 /* ================================================================ Smaller screens */
 @media (max-width: 1100px) {
@@ -1072,7 +1142,6 @@ button:focus-visible, a:focus-visible, input:focus-visible {
     grid-template-columns: minmax(0, 1fr); grid-template-rows: none;
     grid-template-areas: "before" "buy" "during" "after";
   }
-  .products { margin-left: 0; }
 }
 @media (max-width: 640px) {
   .view-home { padding: 32px 16px; align-items: flex-start; }
@@ -1111,10 +1180,15 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   .story .when { line-height: 1.4; }
   .facts span, .story .what, .step label, .muted { font-size: 16px; }
   .overlay { padding: 12px; }
-  .overlay-panel { padding: 16px; border-radius: 18px; max-height: calc(100dvh - 24px); }
+  .overlay-panel { padding: 18px 16px 16px; border-radius: 18px; max-height: calc(100dvh - 24px); }
   .media { aspect-ratio: 4 / 5; max-height: calc(100dvh - 120px); }
   .media-switch { top: 44px; left: 12px; right: auto; justify-content: flex-start; }
   .panel-head-right .source { display: none; }
+  .panel-head h2 { font-size: 19px; }
+  .panel-foot { flex-direction: column; align-items: stretch; gap: 12px; }
+  .panel-foot .adv-total b { font-size: 24px; }
+  .panel-foot .adv-cta { width: 100%; }
+  .adv-store-head { flex-wrap: wrap; gap: 2px; }
   .phases { grid-template-columns: minmax(0, 1fr); }
   .popover { right: 0; }
   .view-report, .view-home { overflow-x: hidden; }

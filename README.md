@@ -77,6 +77,8 @@ backend/app/         FastAPI API and the report engine
   briefing.py        The narrated video briefing (script written by code)
   pdf_report.py      The report as a PDF (ReportLab), with the pictures of the home
   view.py            The report as the web app shows it (headline, facts, stories)
+  simulations.py     The four hazards drawn by AI on a photo of a demo home's street
+  demo.py            The demo homes, answered from packs built ahead of time
   providers/         One module per external service
 backend/scripts/     Batch pipelines: cache warm-up, Catalan layers, Copernicus CDS,
                      fal.ai library, Devin runs
@@ -89,6 +91,29 @@ Two speeds keep the app fast: live APIs with a disk cache for everything a reque
 changes little (Catalan wildfire perimeters and avalanche map, flood episodes, Copernicus
 projections). The Climate Data Store is a job queue that can take hours, so it is never
 on the path of a request.
+
+### The demo home
+
+A demonstration has a third speed: nothing at all. Most of a report is cached for a
+month, but alerts expire in half an hour and the forecast in three, and when one of them
+moves the report moves with it — a different briefing to encode, a street simulation
+drawn for a level the card no longer shows. So `backend/scripts/demo_build.py` builds
+the whole thing once for the addresses pinned in `demo.py` (today, **Avinguda Garona 10,
+Vielha**) and files it in `data/demo`: the report, the PDF, the narrated briefing, the
+point the address resolves to, and the address itself as the first suggestion while it
+is typed. `/api/report`, `/api/report/pdf`, `/api/locate` and `/api/briefing` then answer
+from those files in milliseconds, and the page fetches the briefing before anyone presses
+the button.
+
+A pack is an ordinary report, built by the same code from the same sources, and it
+carries the moment it was built — so build it the morning of the demonstration: a pack
+from last week describes last week's alerts. `--whole` covers the detours too (the same
+home as a flat on the fourth floor, the plan re-ranked for children), `--check` says what
+is ready and how old it is, and `PREVIOUS_DEMO=0` puts every pinned address back on the
+live path.
+
+Google's terms do not allow the street-level picture of the home to be stored, so that
+one picture, and the map tiles, are still fetched while the page opens.
 
 ### Scores
 
@@ -127,6 +152,10 @@ Interactive documentation: http://localhost:8000/docs.
 ```bash
 # Warm the cache for a list of homes (mind Open-Meteo's hourly limit)
 .venv/Scripts/python.exe backend/scripts/prewarm.py --places "Carrer Sarriulera 10, Vielha"
+
+# The demo homes: report, PDF and narrated briefing built ahead of the demonstration
+.venv/Scripts/python.exe backend/scripts/demo_build.py --whole
+.venv/Scripts/python.exe backend/scripts/demo_build.py --check
 
 # Rebuild the Catalan layers (needs backend/requirements-batch.txt)
 .venv/Scripts/python.exe backend/scripts/catalonia_build.py

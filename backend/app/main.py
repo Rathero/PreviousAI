@@ -15,8 +15,8 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
-from . import (autonomy_store, briefing, cache, claims, config, dwelling as DW, interpret, mapping,
-               media, pdf_report, protection, report as R, scoring, video, view)
+from . import (autonomy_store, briefing, cache, claims, config, demo, dwelling as DW, interpret,
+               mapping, media, pdf_report, protection, report as R, scoring, video, view)
 from .providers import ai, cds, cds_baseline, fal, geocoding, miteco, open_meteo, streetview
 
 FRONTEND_DIR = config.ROOT / "frontend"
@@ -63,6 +63,7 @@ async def health():
             "illustrations": media.status()["generated"],
             "ffmpeg": video.available(),
         },
+        "demo": demo.status(),
     }
 
 
@@ -71,13 +72,26 @@ async def health():
 # --------------------------------------------------------------------------- #
 @app.get("/api/suggest")
 async def suggest(q: str = Query(min_length=1, max_length=200)):
-    """Address suggestions while typing (Spanish addresses)."""
-    return {"query": q, "results": await geocoding.suggest(q)}
+    """Address suggestions while typing (Spanish addresses).
+
+    A pinned home (demo.py) is offered first while what is typed is still the start of
+    it: the address service knows that street under another name and at other numbers,
+    so picking a suggestion would otherwise land on a different home.
+    """
+    results = await geocoding.suggest(q)
+    pinned = demo.suggestion(q) if demo.enabled() else None
+    if pinned:
+        results = [pinned] + [r for r in results if r["text"] != pinned["text"]]
+    return {"query": q, "results": results[:6]}
 
 
 @app.get("/api/locate")
 async def locate(q: str = Query(min_length=2, max_length=300)):
     """The point an address resolves to, before the report is built."""
+    pinned = demo.pack(demo.match(q), demo.variant("house", None, []))
+    stored = demo.view(pinned) if pinned else None
+    if stored:
+        return {**stored["location"], "aerial": stored.get("aerial")}
     try:
         place = await geocoding.resolve(q)
     except geocoding.GeocodingError as exc:
@@ -127,7 +141,15 @@ async def home_report(
     who: str | None = Query(None, description="Who lives there, comma-separated: "
                                               + ", ".join(interpret.PROFILES)),
 ):
-    """The web app's report for a home: four risks, the history and the action plan."""
+    """The web app's report for a home: four risks, the history and the action plan.
+
+    A pinned home (demo.py) answers from the pack built for it, so nothing is waited for
+    and no value moves between one showing and the next.
+    """
+    pinned = demo.pack(demo.match(address), demo.variant(home, floor, _profile(who)))
+    stored = demo.view(pinned) if pinned else None
+    if stored:
+        return stored
     return view.app_view(await _home_report(address, home, floor, who))
 
 
@@ -150,7 +172,16 @@ async def home_report_pdf(
 ):
     """The same report as a PDF to keep and share: every value behind each score, what
     already happened, the climate to 2050, the full action plan and the sources, with the
-    pictures of the home. Drawn on request, never stored."""
+    pictures of the home. Drawn on request and not kept, except for the pinned homes
+    (demo.py), whose PDF was drawn with the rest of their pack."""
+    pinned = demo.pack(demo.match(address), demo.variant(home, floor, _profile(who)))
+    ready = demo.pdf(pinned) if pinned else None
+    if ready:
+        body, name = ready
+        return Response(body, media_type="application/pdf", headers={
+            "Content-Disposition": f'attachment; filename="{name}"',
+            "Cache-Control": "no-store",
+        })
     rep = await _home_report(address, home, floor, who)
     app_view = view.app_view(rep)
     pictures = await pdf_report.pictures(rep)
@@ -337,8 +368,16 @@ async def briefing_start(body: BriefingRequest):
     """Starts the narrated video briefing for a point and returns its job at once.
 
     The script is written by code from the report; fal.ai only reads it aloud. Poll
-    GET /api/briefing/{id} until `status` is "done".
+    GET /api/briefing/{id} until `status` is "done". A pinned home (demo.py) answers
+    "done" at once with the MP4 rendered when its pack was built.
     """
+    # A trip, or dates, is not what a pinned home was built for: those go the live way.
+    dated = bool(body.months or body.start or body.end)
+    place = None if dated else demo.match_point(body.lat, body.lon)
+    pinned = demo.pack(place, demo.variant(body.home, body.floor, _profile(body.profile)))
+    ready = demo.briefing(pinned) if pinned else None
+    if ready and bool(ready.get("narrated")) == bool(body.narrate and fal.available()):
+        return {"id": ready["id"], "status": "done", "progress": "ready", "result": ready}
     if not video.available():
         raise HTTPException(status_code=503, detail="ffmpeg not found: pip install imageio-ffmpeg")
     try:

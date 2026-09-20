@@ -7,7 +7,7 @@ sentence under it and its record, newest first, all from the report's own histor
     fires seen by satellite within 10 km (Deepfire, from January 2025);
   - flood episodes that affected the municipality (AGORA, 1902-2020) and the wettest days
     of the ERA5 record;
-  - avalanches observed within 1 km (ICGC);
+  - avalanches observed within 1 km, or recalled there in ICGC's local surveys;
   - the hottest days of the ERA5 record.
 
 A record that covers the place and holds nothing says so, and a place no record covers
@@ -26,6 +26,10 @@ HEAVY_RAIN_MM = 50.0
 
 ERA5 = "ERA5 reanalysis (Copernicus)"
 TEXT = "What the records show near this address."
+# Avalanches recalled in ICGC's local surveys carry no date, so nothing of them can be
+# listed in the record: the note says so rather than leaving the column reading "nothing".
+SURVEYED_NOTE = ("Avalanches recalled in ICGC's local surveys carry no date, so they are "
+                 "counted here but not listed below.")
 
 
 def _day(iso: str | None) -> str:
@@ -162,6 +166,7 @@ def _heat(report: dict) -> dict:
 
 def _avalanche(report: dict, items: list[dict], tile: dict | None) -> dict:
     observed = _indicator(report, "avalanche", "avalanche_observed")
+    surveyed = _indicator(report, "avalanche", "avalanche_surveyed")
     record = _kind(items, "avalanche")
     if _count(observed):
         n = _count(observed)
@@ -169,11 +174,20 @@ def _avalanche(report: dict, items: list[dict], tile: dict | None) -> dict:
         return {"available": True, "value": str(n), "unit": _plural(n, "avalanche"),
                 "fact": f"Observed within 1 km{since}.", "phrase": "avalanches",
                 "record": record, "notes": []}
+    # ICGC's database has no observation here, but its surveys collected avalanches the
+    # people who live here remember. Counting them keeps the tile from saying "none"
+    # while the story beside it lists them.
+    if _count(surveyed):
+        n = _count(surveyed)
+        return {"available": True, "value": str(n), "unit": _plural(n, "avalanche"),
+                "fact": "Recalled by local people within 1 km.", "phrase": "avalanches",
+                "record": record, "notes": [SURVEYED_NOTE],
+                "empty": "No dated avalanche on record near this address."}
     # A place without slopes or snow keeps saying why.
     if tile and tile.get("ruled_out") and tile.get("fact"):
         return _none(tile["fact"])
-    if observed:
-        return _none("No avalanches observed within 1 km.")
+    if observed or surveyed:
+        return _none("No avalanche observed or recalled within 1 km.")
     return _none("No avalanche record covers this address.")
 
 

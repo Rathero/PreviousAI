@@ -251,9 +251,14 @@
     <div class="overlay-backdrop" data-close></div>
     <div class="overlay-panel plan-panel glass-solid" role="dialog" aria-modal="true" aria-labelledby="planTitle">
       <div class="panel-head">
-        <h2 id="planTitle">Your action plan</h2>
+        <div class="panel-title">
+          <h2 id="planTitle">Your action plan</h2>
+          <p class="panel-sub" id="planSub"></p>
+        </div>
         <button type="button" class="icon-btn" id="planClose" data-close aria-label="Close">&times;</button>
       </div>
+      <div class="panel-bar" id="planBar" role="progressbar" aria-label="Steps done"
+           aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span></span></div>
       <div class="tabs" id="planTabs" role="tablist" aria-label="Plans"></div>
       <div class="plan scroll" id="plan"></div>
     </div>
@@ -264,10 +269,14 @@
     <div class="overlay-backdrop" data-close></div>
     <div class="overlay-panel adv-panel glass-solid" role="dialog" aria-modal="true" aria-labelledby="advDialogTitle">
       <div class="panel-head">
-        <h2 id="advDialogTitle">Buy the kit</h2>
+        <div class="panel-title">
+          <h2 id="advDialogTitle">Buy the kit</h2>
+          <p class="panel-sub" id="advSub"></p>
+        </div>
         <button type="button" class="icon-btn" id="advClose" data-close aria-label="Close">&times;</button>
       </div>
       <div class="adv-stores scroll" id="advStores"></div>
+      <div class="panel-foot" id="advFoot"></div>
     </div>
   </div>
 
@@ -276,7 +285,10 @@
     <div class="overlay-backdrop" data-close></div>
     <div class="overlay-panel grants-panel glass-solid" role="dialog" aria-modal="true" aria-labelledby="grantsTitle">
       <div class="panel-head">
-        <h2 id="grantsTitle">Public money for this home</h2>
+        <div class="panel-title">
+          <h2 id="grantsTitle">Public money for this home</h2>
+          <p class="panel-sub" id="grantsSub"></p>
+        </div>
         <button type="button" class="icon-btn" id="grantsClose" data-close aria-label="Close">&times;</button>
       </div>
       <div class="grants scroll" id="grants"></div>

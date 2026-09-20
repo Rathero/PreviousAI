@@ -59,6 +59,9 @@ CLIMATE_MODELS = _env("CLIMATE_MODELS", "EC_Earth3P_HR,MRI_AGCM3_2_S,MPI_ESM1_2_
 CACHE_TTL_SECONDS = int(_env("CACHE_TTL", str(30 * 24 * 3600)))
 # If a source is unreachable, serve the last saved answer even if it has expired.
 OFFLINE_FALLBACK = _env("OFFLINE_FALLBACK", "1") == "1"
+# Answer the pinned demo homes (app/demo.py) from the packs built ahead of time.
+# 0 puts them back on the live path.
+DEMO_PINNED = _env("PREVIOUS_DEMO", "1") == "1"
 
 # --- Copernicus Climate Data Store and Early Warning Data Store -------------------
 CDS_URL = _env("CDS_URL", "https://cds.climate.copernicus.eu/api")

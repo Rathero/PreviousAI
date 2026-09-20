@@ -273,6 +273,14 @@ def _highlights(report: dict) -> list[dict]:
     if n:
         out.append({"number": str(n[0]), "family": "avalanche", "icon": "mountain",
                     "text": f"avalanche{'s' if n[0] != 1 else ''} observed within 1 km since {n[1]}."})
+    else:
+        # No observation on file, but ICGC's surveys collected avalanches local people
+        # remember: the number says so rather than leaving the risk out of the summary.
+        n = _count(report, "avalanche", "avalanche_surveyed")
+        if n:
+            out.append({"number": str(n[0]), "family": "avalanche", "icon": "mountain",
+                        "text": f"avalanche{'s' if n[0] != 1 else ''} within 1 km recalled by "
+                                f"local people."})
     events, since = report.get("events") or {}, _since(report)
     hottest = (events.get("hottest_days") or [None])[0]
     if hottest and len(out) < 3:

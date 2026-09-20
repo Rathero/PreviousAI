@@ -13,6 +13,11 @@ data/cache/
 # Narrated briefings: rendered on demand from each report.
 data/media/briefings/
 
+# The demo homes' packs: report, PDF and briefing built by
+# backend/scripts/demo_build.py. Rebuilt the morning of a demonstration, because a
+# pack describes the alerts and the forecast of the day it was built.
+data/demo/
+
 # fal.ai full-size originals (the web clips, posters, stills and manifest ARE versioned).
 data/media/illustrations/raw/
 # A place's street photo (Google Street View: not stored in the repo) and fal.ai originals.

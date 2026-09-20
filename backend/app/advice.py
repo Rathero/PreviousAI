@@ -20,6 +20,9 @@ from .providers import ai
 MIN_SCORE = 30
 MAX_ITEMS = 6
 MAX_PER_HAZARD = 2
+# Advice written for the people who live there is the reason the household was asked
+# for, so this much of it leads the list even when generic advice ranks as relevant.
+MAX_FOR_PROFILE = 2
 # Months of the Catalan daily avalanche bulletin (December to May, roughly).
 SNOW_SEASON = {12, 1, 2, 3, 4, 5}
 # On a trip, recorded-wildfire advice only makes sense if the weather of those months
@@ -143,7 +146,14 @@ async def personalize(report: dict, person_text: str | None, profile: list[str])
         c["relevance"] = round(result["answers"][f"a{i}"]["noul"], 3)
     # Relevance decides; the hazard's score breaks ties between equally relevant items.
     ranked = sorted(pool, key=lambda c: -(c["relevance"] * (0.6 + 0.4 * c["weight"] / 100)))
-    chosen = _pick([c for c in ranked if c["relevance"] >= 0.5])
+
+    def lead(items: list[dict]) -> list[dict]:
+        """The best advice written for these people first, then the rest of the ranking."""
+        theirs = [c for c in items if c["profiles"]][:MAX_FOR_PROFILE]
+        taken = {id(c) for c in theirs}
+        return theirs + [c for c in items if id(c) not in taken]
+
+    chosen = _pick(lead([c for c in ranked if c["relevance"] >= 0.5]))
     if len(chosen) < 3:  # never less advice than the default
-        chosen = _pick(ranked)
+        chosen = _pick(lead(ranked))
     return {"items": chosen, "by": result.get("model"), **who, "ai": meter.to_dict()}

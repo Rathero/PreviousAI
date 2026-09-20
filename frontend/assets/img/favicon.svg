@@ -1,11 +1,13 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Previous AI">
+  <rect width="64" height="64" fill="#F5F5F5"/>
+  <!-- The mark: two chevrons pointing back, for "previous". Each arm is a wedge, thick at
+       the open end and thin at the point, cut straight down at the right; the pair is
+       drawn once and used twice so both stay identical. -->
   <defs>
-    <linearGradient id="g" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#2f4a32"/>
-      <stop offset="1" stop-color="#101d13"/>
-    </linearGradient>
+    <path id="pv-chevron" d="M32.5 21.3 10.1 29.1 10.1 34.9 32.5 42.7 32.5 36.5 13.7 32 32.5 27.5Z"/>
   </defs>
-  <rect width="64" height="64" rx="16" fill="url(#g)"/>
-  <path d="M22 48V16h11.5c7.2 0 11.5 4 11.5 10.2S40.7 36.5 33.5 36.5H29V48z M29 30.4h4c3.3 0 5-1.5 5-4.2S36.3 22 33 22h-4z" fill="#F7F5EF"/>
-  <circle cx="48" cy="17" r="4" fill="#baf24a"/>
+  <g fill="#080808" stroke="#080808" stroke-width="0.9" stroke-linejoin="round">
+    <use href="#pv-chevron"/>
+    <use href="#pv-chevron" x="21.9"/>
+  </g>
 </svg>

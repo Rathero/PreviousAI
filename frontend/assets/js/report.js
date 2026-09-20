@@ -52,6 +52,9 @@ const FAMILY_ICON = { flood: "waves", wildfire: "flame", heat: "sun", avalanche:
 const SHIELD_SVG = `<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#A6E22E" stroke-width="1.3"
   stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3.5 5.5 6v5.5c0 4.2 2.8 7.3 6.5 9 3.7-1.7 6.5-4.8 6.5-9V6z"></path>
   <path d="m9.3 12.2 1.9 1.9 3.6-3.6"></path></svg>`;
+const STAR_SVG = `<svg class="who-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#A6E22E"
+  stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="3.6"></circle>
+  <path d="M4.8 20c0-4 3.2-6.4 7.2-6.4s7.2 2.4 7.2 6.4"></path></svg>`;
 const TICK_SVG = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#A6E22E" stroke-width="2"
   stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"></path></svg>`;
 // The service a home worth preparing for can ask a partner for, by its worst risk.
@@ -116,30 +119,6 @@ function segmentsHtml(segments) {
 const EUROS = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR" });
 const EUROS_ROUND = new Intl.NumberFormat("es-ES", { style: "currency", currency: "EUR", maximumFractionDigits: 0 });
 
-function productHtml(p) {
-  return `<a class="product" href="${esc(p.url)}" target="_blank" rel="noopener${p.partner ? " sponsored" : ""}">
-    <span class="product-img"><img src="${esc(p.image)}" alt="" loading="lazy" decoding="async"
-      referrerpolicy="no-referrer"></span>
-    <span class="product-body">
-      <span class="product-name">${esc(p.name)}</span>
-      <span class="product-what">${esc(p.what)}</span>
-      <span class="product-buy"><b>${EUROS.format(p.price)}</b> · ${esc(p.store)}<span aria-hidden="true"> →</span></span>
-    </span></a>`;
-}
-
-function productsHtml(item) {
-  const list = item.products || [];
-  return list.length ? `<div class="products">${list.map(productHtml).join("")}</div>` : "";
-}
-
-function pricesNote(plan) {
-  const items = plan.items || plan.phases.flatMap((ph) => ph.items);
-  const seen = ((data && data.action_plan) || {}).prices_seen;
-  if (!seen || !items.some((i) => (i.products || []).length)) return "";
-  return `<p class="plan-fine">Products link to each store's own page. Prices as seen on
-    ${niceDate(seen)}; they change.</p>`;
-}
-
 // The steps of the summary: the emergency numbers, the first step against the worst risk,
 // then the alerts; then the other risks' first steps and the rest of the emergency plan.
 function summarySteps() {
@@ -154,6 +133,22 @@ function summarySteps() {
   hazards.slice(1).forEach((h) => add(checkable(h)[0]));
   ((emergency && emergency.items) || []).slice(2).forEach(add);
   return picks.slice(0, PLAN_STEPS);
+}
+
+// ------------------------------------------------------------------ who lives here
+// The report answers with the household it used; before it comes back, what was picked.
+// Naming them where the plan is means "Update plan" visibly changes something.
+function householdWho() {
+  const chosen = ((data && data.personalization) || {}).profile;
+  if ((chosen || []).length) return chosen;
+  return params.who.map((k) => (PROFILES.find(([key]) => key === k) || [k, k])[1]);
+}
+
+function householdLineHtml() {
+  const who = householdWho();
+  if (!who.length) return "";
+  return `<p class="plan-who">${STAR_SVG}<span>Ranked for ${esc(who.join(" · ").toLowerCase())}
+    <button type="button" class="plain-link" data-household-open>change</button></span></p>`;
 }
 
 // ------------------------------------------------------------------ header
@@ -251,14 +246,17 @@ function stepHtml(item, done) {
     ${done.has(item.id) ? "checked" : ""}><label for="${esc(id)}">${segmentsHtml(item.segments)}</label></li>`;
 }
 
-function stepsColumn(title, items, all, link) {
+// The steps that fit, and the link that opens the whole plan: every step of every plan,
+// in the dialog, never another page.
+function stepsColumn(title, items, all, link, planKey) {
   const done = checkedItems();
   return `
     <div class="col">
       <div class="col-head"><h2>${esc(title)}</h2>
         <span class="done-count">${doneCount(all)} of ${all.length} done</span></div>
+      ${householdLineHtml()}
       <ul class="steps">${items.map((i) => stepHtml(i, done)).join("")}</ul>
-      <a class="more" href="${esc(pageHref("shop"))}" data-nav>${esc(link)}</a>
+      <button type="button" class="more" data-plan-open="${esc(planKey)}">${esc(link)}</button>
     </div>`;
 }
 
@@ -273,7 +271,8 @@ function factHtml(f) {
 // home is the "Before" view's.
 function summaryHtml() {
   const all = plans().flatMap(checkable);
-  return stepsColumn("Your action plan", summarySteps(), all, "See the full plan →") + kitHtml();
+  return stepsColumn("Your action plan", summarySteps(), all, "See the full plan →", "emergency")
+    + kitHtml();
 }
 
 // ------------------------------------------------------------------ what to buy
@@ -345,7 +344,6 @@ function storyHtml(risk) {
       ${rows.length ? `<ul class="story">${rows.map((r) =>
         `<li><span class="when">${esc(whenLabel(r.when))}</span><span class="what">${esc(r.text)}</span></li>`).join("")}</ul>`
         : `<p class="muted">Nothing on record near this address.</p>`}
-      ${risk.illustration ? `<button type="button" class="more" data-illustration="${esc(risk.key)}">What it could look like →</button>` : ""}
     </div>`;
 }
 
@@ -354,7 +352,7 @@ function riskStepsHtml(risk) {
   if (!plan) return "";
   const all = checkable(plan);
   return stepsColumn("What to do first", all.slice(0, PLAN_STEPS), all,
-    all.length > PLAN_STEPS ? `See all ${all.length} steps →` : "See the full plan →");
+    all.length > PLAN_STEPS ? `See all ${all.length} steps →` : "See the full plan →", risk.key);
 }
 
 function calmHtml() {
@@ -400,6 +398,16 @@ function select(key) {
   $$(".tile", $("#tiles")).forEach((t) => t.setAttribute("aria-pressed", String(t.dataset.family === active)));
   renderDetail();
   media.select(active && data ? data.risks.find((r) => r.key === active) : null);
+}
+
+// Drops the risk picked without touching the card: the caller renders it again. The
+// background and the pictures go back to the whole home.
+function clearActive() {
+  if (!active) return;
+  active = null;
+  $("#report").dataset.active = "";
+  $$(".tile", $("#tiles")).forEach((t) => t.setAttribute("aria-pressed", "false"));
+  media.select(null);
 }
 
 // ------------------------------------------------------------------ 2050
@@ -491,7 +499,7 @@ function pastTileHtml(key, risk) {
     </button>`;
 }
 
-function recordHtml(rows, notes = []) {
+function recordHtml(rows, notes = [], empty = "Nothing on record near this address.") {
   const sources = [...new Set(rows.map((r) => r.source).filter(Boolean))];
   const title = (r) => (r.url
     ? `<a class="plain-link" href="${esc(r.url)}" target="_blank" rel="noopener">${esc(r.title)}</a>` : esc(r.title));
@@ -502,7 +510,7 @@ function recordHtml(rows, notes = []) {
         <li><span class="when">${esc(whenLabel(r.date))}</span>
           <span class="what"><span class="dot" data-family="${esc(r.family)}" aria-hidden="true"></span>
             <span>${title(r)}${r.detail ? `<small>${esc(r.detail)}</small>` : ""}</span></span></li>`).join("")}</ul>`
-        : `<p class="muted">Nothing on record near this address.</p>`}
+        : `<p class="muted">${esc(empty)}</p>`}
       ${notes.map((n) => `<p class="ahead-fine">${esc(n)}</p>`).join("")}
       ${sources.length ? `<p class="ahead-fine">Sources: ${sources.map(esc).join(" · ")}.</p>` : ""}
     </div>`;
@@ -535,7 +543,8 @@ function renderPastDetail() {
     return;
   }
   el.dataset.view = "risk";
-  setHtml(el, storyHtml(risk) + recordHtml(p.record || [], p.notes || []));
+  setHtml(el, storyHtml(risk) + recordHtml(p.record || [], p.notes || [], p.empty
+    || "Nothing on record near this address."));
 }
 
 // ------------------------------------------------------------------ public money
@@ -612,6 +621,9 @@ function renderGrants() {
 function openGrants(key) {
   if (!data) return;
   grantsFamily = key || "all";
+  const n = (grants().items || []).length;
+  $("#grantsSub").textContent = grants().summary
+    || `${n} programme${n === 1 ? "" : "s"} that can pay for part of the plan`;
   renderGrants();
   grantsFocus = document.activeElement;
   $("#grantsDialog").hidden = false;
@@ -638,7 +650,11 @@ function renderControls() {
 }
 
 function setHorizon(next) {
-  horizon = ["before", "2050"].includes(next) ? next : "today";
+  const wanted = ["before", "2050"].includes(next) ? next : "today";
+  // Before, today and 2050 answer different questions, so moving between them starts
+  // from the whole home again rather than keeping the risk picked in the one before.
+  if (wanted !== horizon) clearActive();
+  horizon = wanted;
   $("#report").dataset.horizon = horizon;
   $$(".horizon-btn").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.horizon === horizon)));
   if (!data) return;
@@ -648,6 +664,8 @@ function setHorizon(next) {
 }
 
 // ------------------------------------------------------------------ full plan
+// Every step of every plan, and nothing to buy: the products live outside the dialog,
+// beside the risks ("What to buy") and on the pages that sell them.
 function renderPlanTabs() {
   const all = plans();
   if (!all.some((p) => p.key === activePlan)) activePlan = "emergency";
@@ -665,22 +683,52 @@ function renderPlanTabs() {
 function planItemHtml(item, isCheckable, done) {
   if (!isCheckable) return `<li class="bullet"><span>${segmentsHtml(item.segments)}</span></li>`;
   return `<li><label class="check"><input type="checkbox" data-item="${esc(item.id)}"
-    ${done.has(item.id) ? "checked" : ""}><span>${segmentsHtml(item.segments)}</span></label>${productsHtml(item)}</li>`;
+    ${done.has(item.id) ? "checked" : ""}><span>${segmentsHtml(item.segments)}</span></label></li>`;
+}
+
+// The head of the dialog: what this plan is, how much of it is done, and who it was
+// ranked for. The bar is the whole plan's, not the tab's, so closing a tab never looks
+// like progress lost.
+function renderPlanHead() {
+  const all = plans().flatMap(checkable);
+  const done = doneCount(all);
+  const who = householdWho();
+  const parts = [`${done} of ${all.length} steps done`];
+  if (who.length) parts.push(`ranked for ${who.join(" · ").toLowerCase()}`);
+  $("#planSub").textContent = parts.join(" · ");
+  const bar = $("#planBar");
+  bar.style.setProperty("--done", all.length ? `${Math.round((done / all.length) * 100)}%` : "0%");
+  bar.setAttribute("aria-valuenow", String(all.length ? Math.round((done / all.length) * 100) : 0));
+}
+
+// What the household changes in the plan: the advice the report ranked for these people,
+// with the ones written for them marked.
+function householdBlockHtml(items) {
+  if (!items.length) return "";
+  const who = householdWho();
+  return `
+    <section class="household">
+      <div class="household-head">
+        ${STAR_SVG}<h3>For your household</h3>
+        ${who.length ? `<span class="household-who">${esc(who.join(" · "))}</span>` : ""}
+      </div>
+      <ul>${items.map((a) => `<li${(a.profiles || []).length ? ' class="for-them"' : ""}>
+        <span>${esc(a.text)}</span>
+        ${a.hazard_label ? `<small>${esc(a.hazard_label)}</small>` : ""}</li>`).join("")}</ul>
+    </section>`;
 }
 
 function renderPlan() {
   const ap = (data && data.action_plan) || {};
   const plan = plans().find((p) => p.key === activePlan) || plans()[0];
   if (!plan) { $("#plan").innerHTML = `<p class="muted">No plan available.</p>`; return; }
+  renderPlanHead();
   const done = checkedItems();
   if (plan.key === "emergency") {
-    const household = (ap.household || []).length
-      ? `<section class="household"><h3>For your household</h3><ul>${ap.household.map((a) =>
-        `<li>${esc(a.text)}</li>`).join("")}</ul></section>`
-      : "";
+    const household = householdBlockHtml(ap.household || []);
     // Recommended by Norma — fixed with Claude Opus 5 via Claude Code
     setHtml($("#plan"), `${household}<ul class="emergency">
-      ${plan.items.map((i) => planItemHtml(i, true, done)).join("")}</ul>${pricesNote(plan)}`);
+      ${plan.items.map((i) => planItemHtml(i, true, done)).join("")}</ul>`);
     return;
   }
   const note = plan.note ? `<p class="plan-note">${esc(plan.note)}</p>` : "";
@@ -689,7 +737,7 @@ function renderPlan() {
     <section class="phase" data-phase="${esc(ph.key)}">
       <h3>${esc(ph.label)}</h3>
       <ul>${ph.items.map((i) => planItemHtml(i, CHECKABLE.has(ph.key), done)).join("")}</ul>
-    </section>`).join("")}</div>${pricesNote(plan)}`);
+    </section>`).join("")}</div>`);
 }
 
 let planFocus = null;
@@ -910,6 +958,17 @@ function renderKit() {
     + `Store links are affiliate links: Previous AI earns a commission and you pay the same price. ${kit.note}`;
 }
 
+// One row per item, the same as everywhere else in the app: the store's photo, what it
+// is, the price and the link that opens its page.
+function advStoreRowHtml(item) {
+  return `
+    <li><a class="kit-row" href="${esc(item.url)}" target="_blank" rel="noopener sponsored">
+      <span class="kit-shot"><img src="${esc(item.image)}" alt="" loading="lazy" decoding="async"
+        referrerpolicy="no-referrer"></span>
+      <span class="kit-item"><b>${esc(item.name)}</b><span>${esc(item.what)}</span></span>
+      <span class="kit-price"><b>${EUROS.format(item.price)}</b><small>View ↗</small></span></a></li>`;
+}
+
 function openAdv() {
   const kit = advancedKit();
   if (!kit) return;
@@ -919,16 +978,22 @@ function openAdv() {
     if (!s) { s = { name: item.store, items: [] }; stores.push(s); }
     s.items.push(item);
   });
-  setHtml($("#advStores"), `
-    <p class="plan-note">Each store sells its part of the kit: open each item at its store to buy it.</p>
-    ${stores.map((s) => `
-      <section class="adv-store">
-        <div class="adv-store-head"><h3>${esc(s.name)}</h3>
-          <span>${s.items.length} item${s.items.length > 1 ? "s" : ""} · ${EUROS.format(s.items.reduce((t, i) => t + i.price, 0))}</span></div>
-        <ul>${s.items.map((i) => `
-          <li><span class="adv-store-item">${esc(i.name)}</span><b>${EUROS.format(i.price)}</b>
-            <a class="plain-link" href="${esc(i.url)}" target="_blank" rel="noopener sponsored">View ↗</a></li>`).join("")}</ul>
-      </section>`).join("")}`);
+  $("#advSub").textContent = `${kit.items.length} items across ${stores.length} `
+    + `store${stores.length === 1 ? "" : "s"} · each one opens at its own shop`;
+  setHtml($("#advStores"), stores.map((s) => `
+    <section class="adv-store">
+      <div class="adv-store-head">
+        <h3>${esc(s.name)}</h3>
+        <span>${s.items.length} item${s.items.length > 1 ? "s" : ""} ·
+          ${EUROS.format(s.items.reduce((t, i) => t + i.price, 0))}</span>
+      </div>
+      <ul class="kit-preview">${s.items.map(advStoreRowHtml).join("")}</ul>
+    </section>`).join(""));
+  // Buying the whole kit in one go. The checkout is not built yet, so the button does
+  // nothing; when it is, this is where the purchase starts.
+  setHtml($("#advFoot"), `
+    <div class="adv-total"><b>${EUROS_ROUND.format(kit.total)}</b><span>the whole kit</span></div>
+    <button type="button" class="adv-cta" data-buy-kit>Buy this kit</button>`);
   advFocus = document.activeElement;
   $("#advDialog").hidden = false;
   document.body.classList.add("modal-open");
@@ -967,6 +1032,19 @@ function showPage(next) {
     // The card fits its rows only while it shows.
     if (data) renderDetail();
   }
+}
+
+// ------------------------------------------------------------------ briefing
+// A pinned home (backend/app/demo.py) already has its briefing rendered, and says so.
+// Fetching it now, quietly, means pressing the button plays it instead of downloading
+// it. It is the browser's own cache: a failure here costs nothing.
+let preloaded = null;
+
+function preloadBriefing() {
+  const video = ((data && data.pinned) || {}).briefing_video;
+  if (!video || preloaded === video) return;
+  preloaded = video;
+  fetch(video, { cache: "force-cache" }).catch(() => { /* it will be fetched when played */ });
 }
 
 // ------------------------------------------------------------------ PDF
@@ -1040,13 +1118,19 @@ function openHousehold(open) {
 function applyHousehold() {
   params.who = [...householdDraft];
   store.set("pai:household", params.who);
+  const apply = $("#householdApply");
+  apply.disabled = true;
+  apply.textContent = "Updating…";
   openHousehold(false);
   const url = new URL(window.location.href);
   if (params.who.length) url.searchParams.set("who", params.who.join(","));
   else url.searchParams.delete("who");
   history.replaceState({}, "", url);
   renderHeader();
-  loadReport({ keep: true });
+  loadReport({ keep: true }).finally(() => {
+    apply.disabled = false;
+    apply.textContent = "Update plan";
+  });
 }
 
 // ------------------------------------------------------------------ loading
@@ -1082,6 +1166,7 @@ async function loadReport({ keep = false } = {}) {
       media.setPlace({ lat: data.location.latitude, lon: data.location.longitude,
                        label: data.location.label, aerial: data.aerial, zoom: data.zoom });
     }
+    preloadBriefing();
   } catch (err) {
     if (err.name === "AbortError" || mine !== token) return;
     heroError(err.status === 404 ? err.message
@@ -1136,11 +1221,11 @@ export function initReport(appRef) {
   });
 
   $("#detail").addEventListener("click", (e) => {
+    // The click must not reach the document listener that closes the popover again.
+    if (e.target.closest("[data-household-open]")) { e.stopPropagation(); openHousehold(true); return; }
     if (e.target.closest("[data-adv-buy]")) { openAdv(); return; }
     const more = e.target.closest("[data-plan-open]");
-    if (more) { openPlan(more.dataset.planOpen); return; }
-    const ill = e.target.closest("[data-illustration]");
-    if (ill && data) media.showIllustration(data.risks.find((r) => r.key === ill.dataset.illustration));
+    if (more) openPlan(more.dataset.planOpen);
   });
   $("#detail").addEventListener("change", onChecked);
   // A store photo that does not load leaves an empty frame, not a broken image.
@@ -1155,11 +1240,6 @@ export function initReport(appRef) {
     if (data && page === "risks" && desktop.matches) renderDetail();
   }, 150));
   $("#plan").addEventListener("change", onChecked);
-  // A store photo that does not load leaves an empty frame, not a broken image.
-  $("#plan").addEventListener("error", (e) => {
-    const frame = e.target.closest && e.target.closest(".product-img");
-    if (frame) frame.classList.add("broken");
-  }, true);
 
   $("#planTabs").addEventListener("click", (e) => {
     const tab = e.target.closest(".tab");
@@ -1211,6 +1291,11 @@ export function initReport(appRef) {
   $("#advDialog").addEventListener("click", (e) => {
     if (e.target.closest("[data-close]")) closeAdv();
   });
+  // A store photo that does not load leaves an empty frame, not a broken image.
+  $("#advStores").addEventListener("error", (e) => {
+    const frame = e.target.closest && e.target.closest(".kit-shot");
+    if (frame) frame.classList.add("broken");
+  }, true);
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && !$("#advDialog").hidden) closeAdv();
   });
