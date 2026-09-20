@@ -33,7 +33,6 @@
   --cta-text: #324836;
   --cta-hover: #baf24a;
   --cta-orange: #D65B00;
-  --cta-orange-hover: #EE6A0A;
   --lime: #baf24a;
   --link: #A6E22E;
 
@@ -313,14 +312,14 @@ button:focus-visible, a:focus-visible, input:focus-visible {
   font-family: var(--font-body);
   font-weight: 700;
   font-size: 16px;
-  color: var(--cream);
+  color: var(--cta-text);
   border-radius: 14px;
   border: none;
   cursor: pointer;
-  transition: background .15s;
-  background-color: var(--cta-orange);
+  transition: background .15s, color .15s;
+  background-color: var(--cta);
 }
-.cta:hover { background: var(--cta-orange-hover); }
+.cta:hover { background: var(--cta-orange); color: var(--cream); }
 .cta:disabled { opacity: 0.7; cursor: progress; }
 .cta-note { margin: 0; text-align: center; font-size: 13px; line-height: 1.4; color: var(--cream-62); }
 
